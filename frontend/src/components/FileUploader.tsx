@@ -3,10 +3,11 @@ import { uploadFiles } from '../api/client';
 import type { PhotoItem } from '../types';
 
 interface Props {
-  onAddPhotos: (photos: PhotoItem[]) => void;
+  onAddToLibrary: (photos: PhotoItem[]) => void;
+  onDone: () => void;
 }
 
-export default function FileUploader({ onAddPhotos }: Props) {
+export default function FileUploader({ onAddToLibrary, onDone }: Props) {
   const [uploading, setUploading] = useState(false);
   const [previews, setPreviews] = useState<{ file: File; objectUrl: string; id: string }[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -68,11 +69,12 @@ export default function FileUploader({ onAddPhotos }: Props) {
     setUploading(true);
     try {
       const items = await uploadFiles(chosen.map((p) => p.file));
-      onAddPhotos(items);
+      onAddToLibrary(items);
       // Clean up object URLs for uploaded previews
       for (const p of chosen) URL.revokeObjectURL(p.objectUrl);
       setPreviews((prev) => prev.filter((p) => !selected.has(p.id)));
       setSelected(new Set());
+      onDone();
     } catch {
       alert('Upload failed. Please try again.');
     } finally {
@@ -133,7 +135,7 @@ export default function FileUploader({ onAddPhotos }: Props) {
                 >
                   {uploading
                     ? 'Uploading...'
-                    : `Add ${selected.size} photo${selected.size !== 1 ? 's' : ''} as new page`}
+                    : `Add ${selected.size} photo${selected.size !== 1 ? 's' : ''} to library`}
                 </button>
               )}
             </div>

@@ -15,7 +15,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { PhotoGroup } from '../types';
+import type { PhotoGroup, PhotoItem, CustomTemplate } from '../types';
 import PhotoGroupCard from './PhotoGroupCard';
 
 interface SortableGroupProps {
@@ -23,9 +23,20 @@ interface SortableGroupProps {
   pageNumber: number;
   onUpdate: (group: PhotoGroup) => void;
   onDelete: (id: string) => void;
+  importedPhotos: PhotoItem[];
+  customTemplates: CustomTemplate[];
+  onTemplatesChange: () => void;
 }
 
-function SortableGroup({ group, pageNumber, onUpdate, onDelete }: SortableGroupProps) {
+function SortableGroup({
+  group,
+  pageNumber,
+  onUpdate,
+  onDelete,
+  importedPhotos,
+  customTemplates,
+  onTemplatesChange,
+}: SortableGroupProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: group.id,
   });
@@ -51,6 +62,9 @@ function SortableGroup({ group, pageNumber, onUpdate, onDelete }: SortableGroupP
           pageNumber={pageNumber}
           onUpdate={onUpdate}
           onDelete={onDelete}
+          importedPhotos={importedPhotos}
+          customTemplates={customTemplates}
+          onTemplatesChange={onTemplatesChange}
         />
       </div>
     </div>
@@ -59,13 +73,25 @@ function SortableGroup({ group, pageNumber, onUpdate, onDelete }: SortableGroupP
 
 interface Props {
   groups: PhotoGroup[];
+  importedPhotos: PhotoItem[];
+  customTemplates: CustomTemplate[];
+  onTemplatesChange: () => void;
   onUpdateGroup: (group: PhotoGroup) => void;
   onDeleteGroup: (id: string) => void;
   onReorderGroups: (groups: PhotoGroup[]) => void;
   onAddPage: () => void;
 }
 
-export default function BookEditor({ groups, onUpdateGroup, onDeleteGroup, onReorderGroups, onAddPage }: Props) {
+export default function BookEditor({
+  groups,
+  importedPhotos,
+  customTemplates,
+  onTemplatesChange,
+  onUpdateGroup,
+  onDeleteGroup,
+  onReorderGroups,
+  onAddPage,
+}: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -87,12 +113,16 @@ export default function BookEditor({ groups, onUpdateGroup, onDeleteGroup, onReo
       <div className="flex flex-col items-center justify-center py-24 text-gray-400">
         <div className="text-6xl mb-4">📖</div>
         <h2 className="text-xl font-semibold text-gray-600 mb-2">Your photobook is empty</h2>
-        <p className="text-sm mb-6">Import photos from Google Photos to create your first page.</p>
+        <p className="text-sm mb-6">
+          {importedPhotos.length > 0
+            ? 'Add a new page, then assign photos from your library.'
+            : 'Import photos first, then create pages.'}
+        </p>
         <button
           onClick={onAddPage}
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-colors"
         >
-          + Import Photos
+          + Add Page
         </button>
       </div>
     );
@@ -122,6 +152,9 @@ export default function BookEditor({ groups, onUpdateGroup, onDeleteGroup, onReo
                 pageNumber={i + 1}
                 onUpdate={onUpdateGroup}
                 onDelete={onDeleteGroup}
+                importedPhotos={importedPhotos}
+                customTemplates={customTemplates}
+                onTemplatesChange={onTemplatesChange}
               />
             ))}
           </div>

@@ -3,12 +3,13 @@ import { createPickerSession, getPickerSession, getPickerItems, deletePickerSess
 import type { PhotoItem } from '../types';
 
 interface Props {
-  onAddPhotos: (photos: PhotoItem[]) => void;
+  onAddToLibrary: (photos: PhotoItem[]) => void;
+  onDone: () => void;
 }
 
 type PickerState = 'idle' | 'creating' | 'picking' | 'loading' | 'done' | 'error';
 
-export default function AlbumImporter({ onAddPhotos }: Props) {
+export default function AlbumImporter({ onAddToLibrary, onDone }: Props) {
   const [state, setState] = useState<PickerState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -102,7 +103,8 @@ export default function AlbumImporter({ onAddPhotos }: Props) {
     if (chosen.length === 0) return;
     // Clean up the session in the background
     if (sessionId) deletePickerSession(sessionId).catch(() => {});
-    onAddPhotos(chosen);
+    onAddToLibrary(chosen);
+    onDone();
   };
 
   if (state === 'idle') {
@@ -225,7 +227,7 @@ export default function AlbumImporter({ onAddPhotos }: Props) {
               onClick={addSelected}
               className="ml-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-1.5 px-4 rounded-lg transition-colors"
             >
-              Add {selected.size} photo{selected.size !== 1 ? 's' : ''} as new page
+              Add {selected.size} photo{selected.size !== 1 ? 's' : ''} to library
             </button>
           )}
         </div>

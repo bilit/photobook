@@ -3,6 +3,15 @@ import { PDFDocument } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 
+interface TemplateZone {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  priority: number;
+}
+
 interface PhotoItem {
   id: string;
   url: string;
@@ -15,7 +24,8 @@ interface PhotoItem {
 interface PhotoGroup {
   id: string;
   name: string;
-  template: 'focal' | 'grid';
+  template: string; // 'focal' | 'grid' | custom template id
+  templateZones?: TemplateZone[];
   photos: PhotoItem[];
 }
 
@@ -37,7 +47,7 @@ function loadBaseCSS(): string {
 function buildPhotoSlots(photos: PhotoItem[]): string {
   return photos
     .map((photo, i) => {
-      const imgUrl = `${photo.url}=w2000-h2000`;
+      const imgUrl = photo.id.startsWith('local-') ? photo.url : `${photo.url}=w2000-h2000`;
       return `<div class="photo-slot photo-${i}"><img src="${imgUrl}" alt="${photo.filename}" /></div>`;
     })
     .join('\n    ');
@@ -45,23 +55,25 @@ function buildPhotoSlots(photos: PhotoItem[]): string {
 
 function renderFocalTemplate(group: PhotoGroup, baseCSS: string): string {
   const sorted = [...group.photos].sort((a, b) => a.priority - b.priority);
+  const n = sorted.length;
   const template = loadTemplate('focal');
   const slots = buildPhotoSlots(sorted);
   const hasTitle = group.name && group.name.trim() !== '';
 
   return template
     .replace('{{BASE_CSS}}', baseCSS)
-    .replace('{{COUNT}}', String(sorted.length))
+    .replace('{{COUNT}}', String(n))
     .replace('{{PHOTOS}}', slots)
-    .replace('{{#if TITLE}}<div class="page-title">{{TITLE}}</div>{{/if}}',
-      hasTitle ? `<div class="page-title">${group.name}</div>` : '');
+    .replace(
+      '{{#if TITLE}}<div class="page-title">{{TITLE}}</div>{{/if}}',
+      hasTitle ? `<div class="page-title">${group.name}</div>` : ''
+    );
 }
 
 function renderGridTemplate(group: PhotoGroup, baseCSS: string): string {
   const sorted = [...group.photos].sort((a, b) => a.priority - b.priority);
   const n = sorted.length;
   const cols = Math.ceil(Math.sqrt(n));
-
   const template = loadTemplate('grid');
   const slots = buildPhotoSlots(sorted);
   const hasTitle = group.name && group.name.trim() !== '';
@@ -70,14 +82,78 @@ function renderGridTemplate(group: PhotoGroup, baseCSS: string): string {
     .replace('{{BASE_CSS}}', baseCSS)
     .replace('{{COLS}}', String(cols))
     .replace('{{PHOTOS}}', slots)
-    .replace('{{#if TITLE}}<div class="page-title">{{TITLE}}</div>{{/if}}',
-      hasTitle ? `<div class="page-title">${group.name}</div>` : '');
+    .replace(
+      '{{#if TITLE}}<div class="page-title">{{TITLE}}</div>{{/if}}',
+      hasTitle ? `<div class="page-title">${group.name}</div>` : ''
+    );
+}
+
+function renderCustomTemplate(group: PhotoGroup, baseCSS: string): string {
+  const zones = [...(group.templateZones || [])].sort((a, b) => a.priority - b.priority);
+  const sorted = [...group.photos].sort((a, b) => a.priority - b.priority);
+  const hasTitle = group.name && group.name.trim() !== '';
+
+  // Build absolute-positioned zone CSS
+  const zoneCSS = zones
+    .map(
+      (zone, i) => `.zone-${i} {
+      position: absolute;
+      left: ${zone.x}%;
+      top: ${zone.y}%;
+      width: ${zone.width}%;
+      height: ${zone.height}%;
+      overflow: hidden;
+      border-radius: 2mm;
+      background: #f0f0f0;
+    }`
+    )
+    .join('\n');
+
+  // Map photos to zones
+  const photoSlots = zones
+    .map((_, i) => {
+      const photo = sorted[i];
+      if (!photo) return `<div class="zone-${i}"></div>`;
+      const imgUrl = photo.id.startsWith('local-') ? photo.url : `${photo.url}=w2000-h2000`;
+      return `<div class="zone-${i}"><img src="${imgUrl}" alt="${photo.filename}" style="width:100%;height:100%;object-fit:cover;" /></div>`;
+    })
+    .join('\n    ');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+${baseCSS}
+
+.layout {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+${zoneCSS}
+</style>
+</head>
+<body>
+<div class="page">
+  ${hasTitle ? `<div class="page-title">${group.name}</div>` : ''}
+  <div class="layout">
+    ${photoSlots}
+  </div>
+</div>
+</body>
+</html>`;
 }
 
 function renderGroup(group: PhotoGroup, baseCSS: string): string {
-  if (group.template === 'grid') {
-    return renderGridTemplate(group, baseCSS);
+  if (group.template === 'grid') return renderGridTemplate(group, baseCSS);
+  if (group.template === 'focal') return renderFocalTemplate(group, baseCSS);
+  // Custom template (has zones)
+  if (group.templateZones && group.templateZones.length > 0) {
+    return renderCustomTemplate(group, baseCSS);
   }
+  // Fallback to focal
   return renderFocalTemplate(group, baseCSS);
 }
 
@@ -108,7 +184,6 @@ export async function generatePhotobook(book: PhotoBook): Promise<Buffer> {
       '--disable-gpu',
     ],
   };
-  // Allow overriding the Chrome executable path via env (e.g. system Chromium)
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   }
@@ -128,13 +203,12 @@ export async function generatePhotobook(book: PhotoBook): Promise<Buffer> {
       throw new Error('No pages to generate');
     }
 
-    // Merge all page PDFs into one document
     const mergedDoc = await PDFDocument.create();
 
     for (const buffer of pageBuffers) {
       const srcDoc = await PDFDocument.load(buffer);
       const pages = await mergedDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-      pages.forEach((p) => mergedDoc.addPage(p));
+      pages.forEach((p: import('pdf-lib').PDFPage) => mergedDoc.addPage(p));
     }
 
     const finalBytes = await mergedDoc.save();
