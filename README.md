@@ -21,36 +21,63 @@ A web app to create PDF photobooks from Google Photos albums.
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a project → Enable **Google Photos Library API**
 3. Create OAuth 2.0 credentials (Web application)
-4. Add authorized redirect URI: `http://localhost:3001/auth/google/callback`
+4. Add authorized redirect URIs:
+   - Development: `http://localhost:3001/auth/google/callback`
+   - Production: `https://<your-domain>/auth/google/callback`
 5. Copy the Client ID and Client Secret
 
 ### 2. Environment variables
 
 ```bash
-cp .env.example backend/.env
+cp backend/.env.example backend/.env
 # Edit backend/.env with your credentials
 ```
 
 ### 3. Install dependencies
 
 ```bash
+npm run install:all
+# or manually:
 cd backend && npm install
 cd ../frontend && npm install
 ```
 
-### 4. Run
+### 4. Run (development)
 
 In two terminals:
 
 ```bash
 # Terminal 1 — backend
-cd backend && npm run dev
+npm run dev:backend
 
 # Terminal 2 — frontend
-cd frontend && npm run dev
+npm run dev:frontend
 ```
 
 Visit `http://localhost:5173`
+
+## Deployment
+
+### Docker (recommended)
+
+```bash
+# Build and run with docker-compose
+cp backend/.env.example backend/.env
+# Edit backend/.env — set NODE_ENV=production, update BACKEND_URL to your domain
+
+docker compose up --build
+```
+
+The app runs on port `3001`. The backend serves the built frontend from the same origin so no separate frontend hosting is needed.
+
+### Manual build
+
+```bash
+npm run build          # builds frontend then backend
+NODE_ENV=production node backend/dist/index.js
+```
+
+In production, `NODE_ENV=production` must be set so the backend serves the frontend static files and sets secure cookies.
 
 ## Usage
 
