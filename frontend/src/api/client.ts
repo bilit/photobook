@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Album, PhotoItem, AuthStatus } from '../types';
+import type { PhotoItem, AuthStatus } from '../types';
 
 const api = axios.create({
   baseURL: '/',
@@ -15,35 +15,46 @@ export async function logout(): Promise<void> {
   await api.get('/auth/logout');
 }
 
-export async function getAlbums(): Promise<Album[]> {
-  const { data } = await api.get('/api/albums');
-  return data.albums;
+export async function createPickerSession(): Promise<{ sessionId: string; pickerUri: string }> {
+  const { data } = await api.post('/api/picker/sessions');
+  return data;
 }
 
-export async function getAlbumPhotos(
-  albumId: string,
+export async function getPickerSession(sessionId: string): Promise<{ mediaItemsSet: boolean }> {
+  const { data } = await api.get(`/api/picker/sessions/${sessionId}`);
+  return data;
+}
+
+export async function getPickerItems(
+  sessionId: string,
   pageToken?: string
 ): Promise<{ items: PhotoItem[]; nextPageToken?: string }> {
   const params: Record<string, string> = {};
   if (pageToken) params.pageToken = pageToken;
-  const { data } = await api.get(`/api/albums/${albumId}/photos`, { params });
+  const { data } = await api.get(`/api/picker/sessions/${sessionId}/items`, { params });
 
-  const items: PhotoItem[] = (data.items || []).map((item: {
+  const items: PhotoItem[] = (data.mediaItems || []).map((item: {
     id: string;
-    baseUrl: string;
-    filename: string;
-    mediaMetadata?: { width?: string; height?: string };
+    mediaFile: {
+      baseUrl: string;
+      filename: string;
+      mediaFileMetadata?: { width?: number; height?: number };
+    };
   }) => ({
     id: item.id,
-    url: item.baseUrl,
-    thumbnailUrl: `${item.baseUrl}=w300-h300`,
-    filename: item.filename,
-    width: parseInt(item.mediaMetadata?.width || '0'),
-    height: parseInt(item.mediaMetadata?.height || '0'),
+    url: item.mediaFile.baseUrl,
+    thumbnailUrl: `${item.mediaFile.baseUrl}=w300-h300`,
+    filename: item.mediaFile.filename,
+    width: item.mediaFile.mediaFileMetadata?.width || 0,
+    height: item.mediaFile.mediaFileMetadata?.height || 0,
     priority: 1,
   }));
 
   return { items, nextPageToken: data.nextPageToken };
+}
+
+export async function deletePickerSession(sessionId: string): Promise<void> {
+  await api.delete(`/api/picker/sessions/${sessionId}`);
 }
 
 export async function uploadFiles(files: File[]): Promise<PhotoItem[]> {

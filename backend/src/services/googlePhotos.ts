@@ -1,90 +1,71 @@
 import axios from 'axios';
 
-const PHOTOS_API = 'https://photoslibrary.googleapis.com/v1';
+const PICKER_API = 'https://photospicker.googleapis.com/v1';
 
-export interface Album {
+export interface PickerSession {
   id: string;
-  title: string;
-  mediaItemsCount: string;
-  coverPhotoBaseUrl: string;
-  coverPhotoMediaItemId: string;
+  pickerUri: string;
+  pollingConfig?: {
+    pollInterval: string;
+    timeoutIn: string;
+  };
+  mediaItemsSet?: boolean;
 }
 
-export interface MediaItem {
+export interface PickerMediaItem {
   id: string;
-  filename: string;
-  baseUrl: string;
-  mimeType: string;
-  mediaMetadata: {
-    width: string;
-    height: string;
-    creationTime: string;
+  createTime: string;
+  type: string;
+  mediaFile: {
+    baseUrl: string;
+    mimeType: string;
+    filename: string;
+    mediaFileMetadata?: {
+      width?: number;
+      height?: number;
+    };
   };
 }
 
-export async function listAlbums(accessToken: string): Promise<Album[]> {
-  const albums: Album[] = [];
-  let pageToken: string | undefined;
-
-  do {
-    const params: Record<string, string> = { pageSize: '50' };
-    if (pageToken) params.pageToken = pageToken;
-
-    const response = await axios.get(`${PHOTOS_API}/albums`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      params,
-    });
-
-    const data = response.data;
-    if (data.albums) {
-      albums.push(...data.albums);
-    }
-    pageToken = data.nextPageToken;
-  } while (pageToken);
-
-  return albums;
-}
-
-export async function listMediaItems(
-  accessToken: string,
-  albumId: string,
-  pageTokenParam?: string
-): Promise<{ items: MediaItem[]; nextPageToken?: string }> {
+export async function createPickerSession(accessToken: string): Promise<PickerSession> {
   const response = await axios.post(
-    `${PHOTOS_API}/mediaItems:search`,
-    { albumId, pageSize: 100, pageToken: pageTokenParam },
+    `${PICKER_API}/sessions`,
+    {},
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
+  return response.data;
+}
+
+export async function getPickerSession(accessToken: string, sessionId: string): Promise<PickerSession> {
+  const response = await axios.get(
+    `${PICKER_API}/sessions/${sessionId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return response.data;
+}
+
+export async function listPickerMediaItems(
+  accessToken: string,
+  sessionId: string,
+  pageToken?: string
+): Promise<{ mediaItems: PickerMediaItem[]; nextPageToken?: string }> {
+  const params: Record<string, string> = { sessionId, pageSize: '100' };
+  if (pageToken) params.pageToken = pageToken;
+
+  const response = await axios.get(`${PICKER_API}/mediaItems`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params,
+  });
 
   return {
-    items: response.data.mediaItems || [],
+    mediaItems: response.data.mediaItems || [],
     nextPageToken: response.data.nextPageToken,
   };
 }
 
-export async function getMediaItem(accessToken: string, mediaItemId: string): Promise<MediaItem> {
-  const response = await axios.get(`${PHOTOS_API}/mediaItems/${mediaItemId}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  return response.data;
-}
-
-export async function refreshMediaItemUrls(
-  accessToken: string,
-  mediaItemIds: string[]
-): Promise<Map<string, string>> {
-  const urlMap = new Map<string, string>();
-
-  await Promise.all(
-    mediaItemIds.map(async (id) => {
-      try {
-        const item = await getMediaItem(accessToken, id);
-        urlMap.set(id, item.baseUrl);
-      } catch {
-        // Keep old URL if refresh fails
-      }
-    })
+export async function deletePickerSession(accessToken: string, sessionId: string): Promise<void> {
+  await axios.delete(
+    `${PICKER_API}/sessions/${sessionId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
   );
-
-  return urlMap;
 }

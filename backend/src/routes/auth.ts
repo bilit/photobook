@@ -26,7 +26,7 @@ passport.use(new GoogleStrategy(
     clientID: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     callbackURL: `${BACKEND_URL}/auth/google/callback`,
-    scope: ['profile', 'email', 'https://www.googleapis.com/auth/photoslibrary.readonly'],
+    scope: ['profile', 'email', 'https://www.googleapis.com/auth/photospicker.mediaitems.readonly'],
   },
   (_accessToken: string, _refreshToken: string, profile: Profile, done: VerifyCallback) => {
     const user: Express.User = {

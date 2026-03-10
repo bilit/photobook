@@ -23,13 +23,6 @@ export interface PhotoBook {
   groups: PhotoGroup[];
 }
 
-export interface Album {
-  id: string;
-  title: string;
-  mediaItemsCount: string;
-  coverPhotoBaseUrl: string;
-}
-
 export interface AuthStatus {
   loggedIn: boolean;
   user?: {
