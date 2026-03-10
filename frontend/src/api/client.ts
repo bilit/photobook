@@ -43,7 +43,7 @@ export async function getPickerItems(
   }) => ({
     id: item.id,
     url: item.mediaFile.baseUrl,
-    thumbnailUrl: `${item.mediaFile.baseUrl}=w300-h300`,
+    thumbnailUrl: `/api/picker/thumbnail?url=${encodeURIComponent(item.mediaFile.baseUrl)}&size=300`,
     filename: item.mediaFile.filename,
     width: item.mediaFile.mediaFileMetadata?.width || 0,
     height: item.mediaFile.mediaFileMetadata?.height || 0,
