@@ -48,7 +48,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use('/auth', authRoutes);
-app.use('/api/albums', photosRoutes);
+app.use('/api/picker', photosRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/uploads', express.static(UPLOADS_DIR));

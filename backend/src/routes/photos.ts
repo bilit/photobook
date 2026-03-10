@@ -1,5 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { listAlbums, listMediaItems } from '../services/googlePhotos';
+import {
+  createPickerSession,
+  getPickerSession,
+  listPickerMediaItems,
+  deletePickerSession,
+} from '../services/googlePhotos';
 
 const router = Router();
 
@@ -11,25 +16,52 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   next();
 }
 
-router.get('/', requireAuth, async (req: Request, res: Response) => {
+// Create a new picker session
+router.post('/sessions', requireAuth, async (req: Request, res: Response) => {
   try {
-    const albums = await listAlbums(req.user!.accessToken);
-    res.json({ albums });
+    const session = await createPickerSession(req.user!.accessToken);
+    res.json({ sessionId: session.id, pickerUri: session.pickerUri });
   } catch (err) {
-    console.error('Error fetching albums:', err);
-    res.status(500).json({ error: 'Failed to fetch albums' });
+    console.error('Error creating picker session:', err);
+    res.status(500).json({ error: 'Failed to create picker session' });
   }
 });
 
-router.get('/:albumId/photos', requireAuth, async (req: Request, res: Response) => {
+// Get picker session status (poll until mediaItemsSet: true)
+router.get('/sessions/:sessionId', requireAuth, async (req: Request, res: Response) => {
   try {
-    const { albumId } = req.params;
+    const session = await getPickerSession(req.user!.accessToken, req.params.sessionId);
+    res.json({ mediaItemsSet: session.mediaItemsSet || false });
+  } catch (err) {
+    console.error('Error getting picker session:', err);
+    res.status(500).json({ error: 'Failed to get picker session' });
+  }
+});
+
+// List selected media items for a session
+router.get('/sessions/:sessionId/items', requireAuth, async (req: Request, res: Response) => {
+  try {
     const pageToken = req.query.pageToken as string | undefined;
-    const result = await listMediaItems(req.user!.accessToken, albumId, pageToken);
+    const result = await listPickerMediaItems(
+      req.user!.accessToken,
+      req.params.sessionId,
+      pageToken
+    );
     res.json(result);
   } catch (err) {
-    console.error('Error fetching photos:', err);
-    res.status(500).json({ error: 'Failed to fetch photos' });
+    console.error('Error listing picker media items:', err);
+    res.status(500).json({ error: 'Failed to list media items' });
+  }
+});
+
+// Delete a picker session
+router.delete('/sessions/:sessionId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    await deletePickerSession(req.user!.accessToken, req.params.sessionId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting picker session:', err);
+    res.status(500).json({ error: 'Failed to delete picker session' });
   }
 });
 
