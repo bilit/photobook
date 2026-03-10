@@ -16,6 +16,12 @@ const PORT = process.env.PORT || 3001;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Required when deployed behind a reverse proxy (e.g. Render, Heroku) so that
+// express-session correctly detects HTTPS and sets secure cookies.
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
 // In production the frontend is served from the same origin, so CORS is only
 // needed in development.
 if (!isProduction) {

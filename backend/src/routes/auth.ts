@@ -7,7 +7,6 @@ dotenv.config();
 
 const router = Router();
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3001';
 
 declare global {
@@ -53,9 +52,9 @@ router.get('/google', passport.authenticate('google'));
 
 router.get(
   '/google/callback',
-  passport.authenticate('google', { failureRedirect: `${FRONTEND_URL}/?error=auth_failed` }),
+  passport.authenticate('google', { failureRedirect: '/?error=auth_failed' }),
   (_req: Request, res: Response) => {
-    res.redirect(`${FRONTEND_URL}/editor`);
+    res.redirect('/editor');
   }
 );
 
