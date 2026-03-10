@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { Router, Request, Response } from 'express';
 import {
   createPickerSession,
@@ -62,6 +63,32 @@ router.delete('/sessions/:sessionId', requireAuth, async (req: Request, res: Res
   } catch (err) {
     console.error('Error deleting picker session:', err);
     res.status(500).json({ error: 'Failed to delete picker session' });
+  }
+});
+
+// Proxy a Google Photos image so the browser doesn't need to send Bearer auth
+router.get('/thumbnail', requireAuth, async (req: Request, res: Response) => {
+  const baseUrl = req.query.url as string;
+  const size = (req.query.size as string) || '300';
+
+  if (!baseUrl || !baseUrl.startsWith('https://')) {
+    res.status(400).json({ error: 'Invalid url parameter' });
+    return;
+  }
+
+  try {
+    const imageUrl = `${baseUrl}=w${size}-h${size}`;
+    const upstream = await axios.get(imageUrl, {
+      headers: { Authorization: `Bearer ${req.user!.accessToken}` },
+      responseType: 'stream',
+    });
+
+    res.setHeader('Content-Type', upstream.headers['content-type'] || 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    upstream.data.pipe(res);
+  } catch (err) {
+    console.error('Error proxying thumbnail:', err);
+    res.status(502).json({ error: 'Failed to fetch image' });
   }
 });
 
