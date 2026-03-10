@@ -7,6 +7,7 @@ import path from 'path';
 import authRoutes from './routes/auth';
 import photosRoutes from './routes/photos';
 import pdfRoutes from './routes/pdf';
+import uploadRoutes, { UPLOADS_DIR } from './routes/upload';
 
 dotenv.config();
 
@@ -43,6 +44,8 @@ app.use(passport.session());
 app.use('/auth', authRoutes);
 app.use('/api/albums', photosRoutes);
 app.use('/api/pdf', pdfRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });

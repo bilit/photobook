@@ -46,6 +46,30 @@ export async function getAlbumPhotos(
   return { items, nextPageToken: data.nextPageToken };
 }
 
+export async function uploadFiles(files: File[]): Promise<PhotoItem[]> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('files', file);
+  }
+  const { data } = await api.post('/api/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return (data.items || []).map((item: {
+    id: string;
+    filename: string;
+    url: string;
+    thumbnailUrl: string;
+  }) => ({
+    id: item.id,
+    url: item.url,
+    thumbnailUrl: item.thumbnailUrl,
+    filename: item.filename,
+    width: 0,
+    height: 0,
+    priority: 1,
+  }));
+}
+
 export async function generatePdf(book: {
   title: string;
   groups: {

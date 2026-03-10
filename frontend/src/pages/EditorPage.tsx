@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import Navbar from '../components/Navbar';
 import AlbumImporter from '../components/AlbumImporter';
+import FileUploader from '../components/FileUploader';
 import BookEditor from '../components/BookEditor';
 import type { PhotoBook, PhotoGroup, PhotoItem } from '../types';
 import { generatePdf } from '../api/client';
@@ -17,6 +18,7 @@ export default function EditorPage({ user }: Props) {
     groups: [],
   });
   const [showImporter, setShowImporter] = useState(false);
+  const [importTab, setImportTab] = useState<'google' | 'upload'>('google');
   const [generating, setGenerating] = useState(false);
 
   const addPhotosAsGroup = (photos: PhotoItem[]) => {
@@ -79,12 +81,18 @@ export default function EditorPage({ user }: Props) {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 space-y-2">
             <button
-              onClick={() => setShowImporter(true)}
+              onClick={() => { setImportTab('google'); setShowImporter(true); }}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
             >
               <span>+</span> Import from Google Photos
+            </button>
+            <button
+              onClick={() => { setImportTab('upload'); setShowImporter(true); }}
+              className="w-full bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors border border-gray-300"
+            >
+              <span>+</span> Upload from Device
             </button>
           </div>
 
@@ -127,7 +135,36 @@ export default function EditorPage({ user }: Props) {
                 </button>
                 <h2 className="text-xl font-bold">Import Photos</h2>
               </div>
-              <AlbumImporter onAddPhotos={addPhotosAsGroup} />
+
+              {/* Source tabs */}
+              <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+                <button
+                  onClick={() => setImportTab('google')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    importTab === 'google'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Google Photos
+                </button>
+                <button
+                  onClick={() => setImportTab('upload')}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    importTab === 'upload'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Upload Files
+                </button>
+              </div>
+
+              {importTab === 'google' ? (
+                <AlbumImporter onAddPhotos={addPhotosAsGroup} />
+              ) : (
+                <FileUploader onAddPhotos={addPhotosAsGroup} />
+              )}
             </div>
           ) : (
             <BookEditor

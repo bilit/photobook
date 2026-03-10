@@ -21,10 +21,10 @@ router.post('/generate', requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    // Collect all unique media item IDs for URL refresh
+    // Collect Google Photos media item IDs (exclude local uploads prefixed with "local-")
     const allPhotoIds = book.groups
       .flatMap((g: { photos: { id: string }[] }) => g.photos.map((p: { id: string }) => p.id))
-      .filter((id: string) => id && id.trim() !== '');
+      .filter((id: string) => id && id.trim() !== '' && !id.startsWith('local-'));
 
     if (allPhotoIds.length > 0) {
       // Refresh photo URLs to avoid expiry
