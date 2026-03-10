@@ -4,8 +4,9 @@ import Navbar from '../components/Navbar';
 import AlbumImporter from '../components/AlbumImporter';
 import FileUploader from '../components/FileUploader';
 import BookEditor from '../components/BookEditor';
-import type { PhotoBook, PhotoGroup, PhotoItem } from '../types';
+import type { PhotoBook, PhotoGroup, PhotoItem, CustomTemplate } from '../types';
 import { generatePdf } from '../api/client';
+import { loadTemplates } from '../templateStore';
 
 interface Props {
   user: { id: string; displayName: string; email: string };
@@ -16,21 +17,31 @@ export default function EditorPage({ user }: Props) {
     id: uuidv4(),
     title: 'My Photobook',
     groups: [],
+    importedPhotos: [],
   });
   const [showImporter, setShowImporter] = useState(false);
   const [importTab, setImportTab] = useState<'google' | 'upload'>('google');
   const [generating, setGenerating] = useState(false);
+  const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>(() => loadTemplates());
 
-  const addPhotosAsGroup = (photos: PhotoItem[]) => {
+  // Add photos to the global pool (dedup by id)
+  const addToLibrary = (photos: PhotoItem[]) => {
     if (photos.length === 0) return;
+    setBook((b) => {
+      const existingIds = new Set(b.importedPhotos.map((p) => p.id));
+      const newPhotos = photos.filter((p) => !existingIds.has(p.id));
+      return { ...b, importedPhotos: [...b.importedPhotos, ...newPhotos] };
+    });
+  };
+
+  const addPage = () => {
     const newGroup: PhotoGroup = {
       id: uuidv4(),
       name: `Page ${book.groups.length + 1}`,
       template: 'focal',
-      photos: photos.map((p, i) => ({ ...p, priority: i + 1 })),
+      photos: [],
     };
     setBook((b) => ({ ...b, groups: [...b.groups, newGroup] }));
-    setShowImporter(false);
   };
 
   const updateGroup = (updatedGroup: PhotoGroup) => {
@@ -46,6 +57,10 @@ export default function EditorPage({ user }: Props) {
 
   const reorderGroups = (newGroups: PhotoGroup[]) => {
     setBook((b) => ({ ...b, groups: newGroups }));
+  };
+
+  const refreshTemplates = () => {
+    setCustomTemplates(loadTemplates());
   };
 
   const handleGeneratePdf = async () => {
@@ -94,13 +109,22 @@ export default function EditorPage({ user }: Props) {
             >
               <span>+</span> Upload from Device
             </button>
+            {book.importedPhotos.length > 0 && (
+              <p className="text-xs text-center text-gray-400">
+                {book.importedPhotos.length} photo{book.importedPhotos.length !== 1 ? 's' : ''} in library
+              </p>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
             {book.groups.length === 0 ? (
               <div className="text-center text-gray-400 mt-8">
                 <div className="text-4xl mb-3">🖼️</div>
-                <p className="text-sm">No pages yet.<br />Import photos to get started.</p>
+                <p className="text-sm">
+                  {book.importedPhotos.length > 0
+                    ? 'Click "+ Add Page" to create pages\nand assign photos from your library.'
+                    : 'Import photos, then add pages.'}
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -133,7 +157,7 @@ export default function EditorPage({ user }: Props) {
                 >
                   ← Back to editor
                 </button>
-                <h2 className="text-xl font-bold">Import Photos</h2>
+                <h2 className="text-xl font-bold">Import Photos to Library</h2>
               </div>
 
               {/* Source tabs */}
@@ -161,18 +185,21 @@ export default function EditorPage({ user }: Props) {
               </div>
 
               {importTab === 'google' ? (
-                <AlbumImporter onAddPhotos={addPhotosAsGroup} />
+                <AlbumImporter onAddToLibrary={addToLibrary} onDone={() => setShowImporter(false)} />
               ) : (
-                <FileUploader onAddPhotos={addPhotosAsGroup} />
+                <FileUploader onAddToLibrary={addToLibrary} onDone={() => setShowImporter(false)} />
               )}
             </div>
           ) : (
             <BookEditor
               groups={book.groups}
+              importedPhotos={book.importedPhotos}
+              customTemplates={customTemplates}
+              onTemplatesChange={refreshTemplates}
               onUpdateGroup={updateGroup}
               onDeleteGroup={deleteGroup}
               onReorderGroups={reorderGroups}
-              onAddPage={() => setShowImporter(true)}
+              onAddPage={addPage}
             />
           )}
         </div>
