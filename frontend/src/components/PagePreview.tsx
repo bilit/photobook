@@ -24,16 +24,16 @@ function fillPageZones(zones: TemplateZone[], photoCount: number): TemplateZone[
 interface Props {
   group: PhotoGroup;
   customTemplates: CustomTemplate[];
-  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
 }
 
-/** A photo slot that supports drag-to-pan when onUpdatePhoto is provided. */
+/** A photo slot that supports drag-to-pan and scroll-to-zoom when onUpdatePhoto is provided. */
 function DraggablePhoto({
   photo,
   onUpdatePhoto,
 }: {
   photo: PhotoItem;
-  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{
@@ -45,6 +45,7 @@ function DraggablePhoto({
 
   const cropX = photo.cropX ?? 50;
   const cropY = photo.cropY ?? 50;
+  const zoom = photo.zoom ?? 1;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!onUpdatePhoto) return;
@@ -77,23 +78,42 @@ function DraggablePhoto({
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!onUpdatePhoto) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newZoom = Math.max(0.5, Math.min(4, zoom + delta));
+    onUpdatePhoto(photo.id, cropX, cropY, Math.round(newZoom * 10) / 10);
+  };
+
   return (
     <div
       ref={containerRef}
-      className="w-full h-full relative"
+      className="w-full h-full relative overflow-hidden"
       onMouseDown={handleMouseDown}
+      onWheel={handleWheel}
       style={{ cursor: onUpdatePhoto ? (dragState.current ? 'grabbing' : 'grab') : 'default' }}
     >
       <img
         src={photo.thumbnailUrl}
         alt={photo.filename}
         className="w-full h-full object-cover"
-        style={{ objectPosition: `${cropX}% ${cropY}%` }}
+        style={{
+          objectPosition: `${cropX}% ${cropY}%`,
+          transform: `scale(${zoom})`,
+          transformOrigin: `${cropX}% ${cropY}%`,
+        }}
         draggable={false}
       />
       <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
         {photo.priority}
       </div>
+      {zoom !== 1 && (
+        <div className="absolute bottom-1 right-1 bg-black bg-opacity-50 text-white text-xs rounded px-1">
+          {zoom.toFixed(1)}×
+        </div>
+      )}
     </div>
   );
 }
@@ -267,10 +287,8 @@ export default function PagePreview({ group, customTemplates, onUpdatePhoto }: P
     );
   }
 
-  const isBuiltIn = group.template === 'focal' || group.template === 'grid';
   const fillPage = group.fillPage;
-  // For built-in templates with fillPage, remove padding for edge-to-edge bleed
-  const paddingClass = isBuiltIn && fillPage ? 'p-0' : 'p-1';
+  const paddingClass = fillPage ? 'p-0' : 'p-1';
 
   const renderLayout = () => {
     if (group.template === 'grid') return <GridPreview photos={group.photos} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;

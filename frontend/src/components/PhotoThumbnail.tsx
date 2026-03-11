@@ -5,9 +5,10 @@ interface Props {
   photo: PhotoItem;
   onPriorityChange: (id: string, priority: number) => void;
   onRemove: (id: string) => void;
+  onZoomChange?: (id: string, zoom: number) => void;
 }
 
-export default function PhotoThumbnail({ photo, onPriorityChange, onRemove }: Props) {
+export default function PhotoThumbnail({ photo, onPriorityChange, onRemove, onZoomChange }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(photo.priority));
 
@@ -68,6 +69,26 @@ export default function PhotoThumbnail({ photo, onPriorityChange, onRemove }: Pr
       <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">
         {photo.filename}
       </div>
+
+      {/* Zoom slider — shown on hover */}
+      {onZoomChange && (
+        <div className="absolute inset-x-0 bottom-0 flex items-center gap-1 px-1 pb-1 pt-4 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+          <input
+            type="range"
+            min={0.5}
+            max={4}
+            step={0.1}
+            value={photo.zoom ?? 1}
+            onChange={(e) => onZoomChange(photo.id, parseFloat(e.target.value))}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 h-1 accent-white cursor-pointer"
+            title={`Zoom: ${(photo.zoom ?? 1).toFixed(1)}×`}
+          />
+          <span className="text-white text-xs flex-shrink-0 w-8 text-right">
+            {(photo.zoom ?? 1).toFixed(1)}×
+          </span>
+        </div>
+      )}
     </div>
   );
 }

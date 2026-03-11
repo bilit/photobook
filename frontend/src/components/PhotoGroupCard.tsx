@@ -16,6 +16,7 @@ interface Props {
   importedPhotos: PhotoItem[];
   customTemplates: CustomTemplate[];
   onTemplatesChange: () => void;
+  showPreview?: boolean;
 }
 
 export default function PhotoGroupCard({
@@ -26,6 +27,7 @@ export default function PhotoGroupCard({
   importedPhotos,
   customTemplates,
   onTemplatesChange,
+  showPreview = true,
 }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(group.name);
@@ -53,8 +55,15 @@ export default function PhotoGroupCard({
     update({ photos });
   };
 
-  const updatePhotoCrop = (photoId: string, cropX: number, cropY: number) => {
-    const photos = group.photos.map((p) => (p.id === photoId ? { ...p, cropX, cropY } : p));
+  const updatePhotoCrop = (photoId: string, cropX: number, cropY: number, zoom?: number) => {
+    const photos = group.photos.map((p) =>
+      p.id === photoId ? { ...p, cropX, cropY, ...(zoom !== undefined ? { zoom } : {}) } : p
+    );
+    update({ photos });
+  };
+
+  const changeZoom = (photoId: string, zoom: number) => {
+    const photos = group.photos.map((p) => (p.id === photoId ? { ...p, zoom } : p));
     update({ photos });
   };
 
@@ -210,18 +219,20 @@ export default function PhotoGroupCard({
                       photo={photo}
                       onPriorityChange={changePriority}
                       onRemove={removePhoto}
+                      onZoomChange={changeZoom}
                     />
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Right: live preview */}
-            <div className="w-full sm:w-72 md:w-96 sm:flex-shrink-0">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-center">Preview</p>
-              <PagePreview group={group} customTemplates={customTemplates} onUpdatePhoto={updatePhotoCrop} />
-              <p className="text-xs text-gray-400 text-center mt-1">Drag photos to reposition</p>
-            </div>
+            {showPreview && (
+              <div className="w-full sm:w-72 md:w-96 sm:flex-shrink-0">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-center">Preview</p>
+                <PagePreview group={group} customTemplates={customTemplates} onUpdatePhoto={updatePhotoCrop} />
+                <p className="text-xs text-gray-400 text-center mt-1">Drag photos to reposition</p>
+              </div>
+            )}
           </div>
         )}
       </div>
