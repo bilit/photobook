@@ -1,4 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+const BOOK_KEY = 'photobook_data';
+const GROUP_KEY = 'photobook_selected_group';
+const LEFT_KEY = 'photobook_left_open';
+const RIGHT_KEY = 'photobook_right_open';
+
+function loadBook(): import('../types').PhotoBook {
+  try {
+    const raw = localStorage.getItem(BOOK_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2), title: 'My Photobook', groups: [], importedPhotos: [] };
+}
 import {
   DndContext,
   closestCenter,
@@ -70,19 +83,37 @@ function SortablePageItem({
 }
 
 export default function EditorPage({ user }: Props) {
-  const [book, setBook] = useState<PhotoBook>({
-    id: uuidv4(),
-    title: 'My Photobook',
-    groups: [],
-    importedPhotos: [],
-  });
+  const [book, setBook] = useState<PhotoBook>(loadBook);
   const [showImporter, setShowImporter] = useState(false);
   const [importTab, setImportTab] = useState<'google' | 'upload'>('google');
   const [generating, setGenerating] = useState(false);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>(() => loadTemplates());
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
+    () => localStorage.getItem(GROUP_KEY)
+  );
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const [leftOpen, setLeftOpen] = useState(() => localStorage.getItem(LEFT_KEY) !== 'false');
+  const [rightOpen, setRightOpen] = useState(() => localStorage.getItem(RIGHT_KEY) !== 'false');
+
+  // Persist book — debounced to avoid hammering storage on every keystroke/drag
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try { localStorage.setItem(BOOK_KEY, JSON.stringify(book)); } catch {}
+    }, 500);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [book]);
+
+  // Persist sidebar state and selected group
+  useEffect(() => { try { localStorage.setItem(LEFT_KEY, String(leftOpen)); } catch {} }, [leftOpen]);
+  useEffect(() => { try { localStorage.setItem(RIGHT_KEY, String(rightOpen)); } catch {} }, [rightOpen]);
+  useEffect(() => {
+    try {
+      if (selectedGroupId) localStorage.setItem(GROUP_KEY, selectedGroupId);
+      else localStorage.removeItem(GROUP_KEY);
+    } catch {}
+  }, [selectedGroupId]);
 
   // Auto-select first page when groups change
   useEffect(() => {
@@ -92,6 +123,18 @@ export default function EditorPage({ user }: Props) {
       setSelectedGroupId(book.groups[0]?.id ?? null);
     }
   }, [book.groups, selectedGroupId]);
+
+  // Auto-select first photo when switching pages
+  useEffect(() => {
+    const group = book.groups.find((g) => g.id === selectedGroupId);
+    if (group) {
+      const sorted = [...group.photos].sort((a, b) => a.priority - b.priority);
+      setSelectedPhotoId(sorted[0]?.id ?? null);
+    } else {
+      setSelectedPhotoId(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroupId]);
 
   const selectedGroup = book.groups.find((g) => g.id === selectedGroupId) ?? null;
   const selectedIndex = book.groups.findIndex((g) => g.id === selectedGroupId);
@@ -360,12 +403,12 @@ export default function EditorPage({ user }: Props) {
                 </div>
 
                 {/* Preview */}
-                <div className="flex-1 min-h-0 flex items-center justify-center p-6">
+                <div className={`flex-1 min-h-0 flex items-center justify-center ${!leftOpen && !rightOpen ? 'p-2' : 'p-4'}`}>
                   <div
                     style={{
                       aspectRatio: '11/8.5',
                       maxHeight: '100%',
-                      maxWidth: 'min(100%, calc((100vh - 160px) * 11 / 8.5))',
+                      maxWidth: `min(100%, calc((100vh - ${!leftOpen && !rightOpen ? 120 : 140}px) * 11 / 8.5))`,
                       width: '100%',
                     }}
                   >
@@ -374,41 +417,54 @@ export default function EditorPage({ user }: Props) {
                       customTemplates={customTemplates}
                       onUpdatePhoto={updatePhotoCrop}
                       onUpdatePhotoFields={updatePhotoFields}
+                      selectedPhotoId={selectedPhotoId}
+                      onSelectPhoto={setSelectedPhotoId}
                     />
                   </div>
                 </div>
 
                 <p className="flex-shrink-0 text-xs text-gray-400 text-center">
-                  Drag to reposition{selectedGroup.template === 'grid' ? ' · Click badges to edit order/span' : ''}
+                  Click to select · Drag to reposition{selectedGroup.template === 'grid' ? ' · Use ±badges to edit order/span' : ''}
                 </p>
 
-                {/* Per-photo zoom sliders */}
-                {selectedGroup.photos.length > 0 && (
-                  <div className="flex-shrink-0 px-4 pb-3 pt-1">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center">
-                      {[...selectedGroup.photos]
-                        .sort((a, b) => a.priority - b.priority)
-                        .map((photo) => (
-                          <div key={photo.id} className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-xs text-gray-400 flex-shrink-0 w-4 text-center font-mono">{photo.priority}</span>
-                            <input
-                              type="range"
-                              min={0.5}
-                              max={4}
-                              step={0.1}
-                              value={photo.zoom ?? 1}
-                              onChange={(e) => updatePhotoCrop(photo.id, photo.cropX ?? 50, photo.cropY ?? 50, parseFloat(e.target.value))}
-                              className="w-20 h-1 accent-blue-500 cursor-pointer"
-                              title={`Photo ${photo.priority} zoom: ${(photo.zoom ?? 1).toFixed(1)}×`}
-                            />
-                            <span className="text-xs text-gray-400 flex-shrink-0 w-7 font-mono">
-                              {(photo.zoom ?? 1).toFixed(1)}×
-                            </span>
-                          </div>
-                        ))}
+                {/* Single zoom slider for selected photo */}
+                {(() => {
+                  const photo = selectedGroup.photos.find((p) => p.id === selectedPhotoId);
+                  if (!photo) return null;
+                  return (
+                    <div className="flex-shrink-0 px-4 pb-3 pt-1 flex items-center gap-2 justify-center">
+                      <span className="text-xs text-gray-400 font-mono flex-shrink-0">
+                        Photo {photo.priority} zoom
+                      </span>
+                      <button
+                        className="text-gray-400 hover:text-gray-600 text-sm leading-none w-5 text-center flex-shrink-0"
+                        onClick={() => {
+                          const newZoom = Math.max(0.5, Math.round(((photo.zoom ?? 1) - 0.1) * 10) / 10);
+                          updatePhotoCrop(photo.id, photo.cropX ?? 50, photo.cropY ?? 50, newZoom);
+                        }}
+                      >−</button>
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={4}
+                        step={0.1}
+                        value={photo.zoom ?? 1}
+                        onChange={(e) => updatePhotoCrop(photo.id, photo.cropX ?? 50, photo.cropY ?? 50, parseFloat(e.target.value))}
+                        className="w-32 h-1 accent-blue-500 cursor-pointer flex-shrink-0"
+                      />
+                      <button
+                        className="text-gray-400 hover:text-gray-600 text-sm leading-none w-5 text-center flex-shrink-0"
+                        onClick={() => {
+                          const newZoom = Math.min(4, Math.round(((photo.zoom ?? 1) + 0.1) * 10) / 10);
+                          updatePhotoCrop(photo.id, photo.cropX ?? 50, photo.cropY ?? 50, newZoom);
+                        }}
+                      >+</button>
+                      <span className="text-xs text-gray-400 font-mono flex-shrink-0 w-7">
+                        {(photo.zoom ?? 1).toFixed(1)}×
+                      </span>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </>
             ) : null}
           </div>
