@@ -23,6 +23,7 @@ export interface PhotoItem {
   width: number;
   height: number;
   priority: number;
+  createdAt?: string; // ISO 8601 timestamp from Google Photos
   cropX?: number;   // 0-100, default 50 (center)
   cropY?: number;   // 0-100, default 50 (center)
   zoom?: number;    // 1.0 = default fill, >1 = zoomed in, <1 = zoomed out

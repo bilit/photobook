@@ -193,6 +193,35 @@ export default function AlbumImporter({ onAddToLibrary, onDone }: Props) {
     );
   }
 
+  // Group photos by day, sorted newest first
+  const photosByDay = (() => {
+    // Sort photos by createdAt descending (newest first), undated last
+    const sorted = [...photos].sort((a, b) => {
+      if (!a.createdAt && !b.createdAt) return 0;
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    const groups: { label: string; photos: typeof photos }[] = [];
+    const seen = new Map<string, typeof photos>();
+
+    for (const photo of sorted) {
+      let label = 'Unknown date';
+      if (photo.createdAt) {
+        const d = new Date(photo.createdAt);
+        label = d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      }
+      if (!seen.has(label)) {
+        seen.set(label, []);
+        groups.push({ label, photos: seen.get(label)! });
+      }
+      seen.get(label)!.push(photo);
+    }
+
+    return groups;
+  })();
+
   // state === 'done'
   return (
     <div>
@@ -241,28 +270,55 @@ export default function AlbumImporter({ onAddToLibrary, onDone }: Props) {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
-          {photos.map((photo) => (
-            <button
-              key={photo.id}
-              onClick={() => togglePhoto(photo.id)}
-              className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                selected.has(photo.id)
-                  ? 'border-blue-500 shadow-lg'
-                  : 'border-transparent hover:border-gray-300'
-              }`}
-            >
-              <img
-                src={photo.thumbnailUrl}
-                alt={photo.filename}
-                className="w-full h-full object-cover"
-              />
-              {selected.has(photo.id) && (
-                <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
-                  <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">✓</div>
-                </div>
-              )}
-            </button>
+        <div className="space-y-6">
+          {photosByDay.map((group) => (
+            <div key={group.label}>
+              <div className="flex items-center gap-3 mb-2">
+                <h4 className="text-sm font-semibold text-gray-700">{group.label}</h4>
+                <span className="text-xs text-gray-400">{group.photos.length} photo{group.photos.length !== 1 ? 's' : ''}</span>
+                <button
+                  onClick={() => {
+                    const allSelected = group.photos.every((p) => selected.has(p.id));
+                    setSelected((s) => {
+                      const next = new Set(s);
+                      if (allSelected) {
+                        group.photos.forEach((p) => next.delete(p.id));
+                      } else {
+                        group.photos.forEach((p) => next.add(p.id));
+                      }
+                      return next;
+                    });
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                >
+                  {group.photos.every((p) => selected.has(p.id)) ? 'Deselect day' : 'Select day'}
+                </button>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                {group.photos.map((photo) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => togglePhoto(photo.id)}
+                    className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                      selected.has(photo.id)
+                        ? 'border-blue-500 shadow-lg'
+                        : 'border-transparent hover:border-gray-300'
+                    }`}
+                  >
+                    <img
+                      src={photo.thumbnailUrl}
+                      alt={photo.filename}
+                      className="w-full h-full object-cover"
+                    />
+                    {selected.has(photo.id) && (
+                      <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
+                        <div className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">✓</div>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
