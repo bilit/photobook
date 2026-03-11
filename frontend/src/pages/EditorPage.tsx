@@ -21,6 +21,7 @@ export default function EditorPage({ user }: Props) {
   });
   const [showImporter, setShowImporter] = useState(false);
   const [importTab, setImportTab] = useState<'google' | 'upload'>('google');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>(() => loadTemplates());
 
@@ -91,20 +92,35 @@ export default function EditorPage({ user }: Props) {
         onGeneratePdf={handleGeneratePdf}
         generating={generating}
         pageCount={book.groups.length}
+        onToggleSidebar={() => setSidebarOpen((o) => !o)}
+        sidebarOpen={sidebarOpen}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile sidebar backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-40 z-20 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+        <div className={`
+          bg-white border-r border-gray-200 flex flex-col
+          fixed md:relative inset-y-0 left-0 z-30
+          w-72 sm:w-80 transform transition-transform duration-200 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}>
           <div className="p-4 border-b border-gray-200 space-y-2">
             <button
-              onClick={() => { setImportTab('google'); setShowImporter(true); }}
+              onClick={() => { setImportTab('google'); setShowImporter(true); setSidebarOpen(false); }}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
             >
               <span>+</span> Import from Google Photos
             </button>
             <button
-              onClick={() => { setImportTab('upload'); setShowImporter(true); }}
+              onClick={() => { setImportTab('upload'); setShowImporter(true); setSidebarOpen(false); }}
               className="w-full bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors border border-gray-300"
             >
               <span>+</span> Upload from Device
@@ -147,7 +163,7 @@ export default function EditorPage({ user }: Props) {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6">
           {showImporter ? (
             <div>
               <div className="flex items-center gap-4 mb-6">

@@ -150,7 +150,7 @@ export default function PhotoGroupCard({
         </div>
 
         {!collapsed && (
-          <div className="p-4 flex gap-4">
+          <div className="p-4 flex flex-col sm:flex-row gap-4">
             {/* Left: controls + photo grid */}
             <div className="flex-1 min-w-0">
               <div className="flex items-start gap-3 mb-3 flex-wrap">
@@ -198,7 +198,7 @@ export default function PhotoGroupCard({
                   No photos — click "Add Photos" to assign from library
                 </div>
               ) : (
-                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                   {sortedPhotos.map((photo: PhotoItem) => (
                     <PhotoThumbnail
                       key={photo.id}
@@ -212,7 +212,7 @@ export default function PhotoGroupCard({
             </div>
 
             {/* Right: live preview */}
-            <div className="w-40 flex-shrink-0">
+            <div className="w-full sm:w-40 sm:flex-shrink-0">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-center">Preview</p>
               <PagePreview group={group} customTemplates={customTemplates} />
             </div>
