@@ -1,4 +1,4 @@
-import puppeteer, { Browser } from 'puppeteer-core';
+import puppeteer, { Browser } from 'puppeteer';
 import { PDFDocument } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
@@ -213,20 +213,6 @@ async function renderPageToPdf(html: string, browser: Browser): Promise<Buffer> 
   }
 }
 
-function findChromiumExecutable(): string | undefined {
-  const candidates = [
-    '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/google-chrome',
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) return p;
-  }
-  return undefined;
-}
-
 export async function generatePhotobook(book: PhotoBook): Promise<Buffer> {
   const baseCSS = loadBaseCSS();
 
@@ -239,9 +225,8 @@ export async function generatePhotobook(book: PhotoBook): Promise<Buffer> {
       '--disable-gpu',
     ],
   };
-  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || findChromiumExecutable();
-  if (executablePath) {
-    launchOptions.executablePath = executablePath;
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   }
   const browser = await puppeteer.launch(launchOptions);
 
