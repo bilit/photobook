@@ -26,6 +26,44 @@ interface Props {
   customTemplates: CustomTemplate[];
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
   onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
+  selectedPhotoId?: string | null;
+  onSelectPhoto?: (photoId: string) => void;
+}
+
+/** A small stepper badge with − value + buttons. */
+function StepBadge({
+  label,
+  value,
+  min,
+  max,
+  onDecrement,
+  onIncrement,
+}: {
+  label?: string;
+  value: number;
+  min: number;
+  max: number;
+  onDecrement: () => void;
+  onIncrement: () => void;
+}) {
+  const btnClass = 'text-white leading-none px-1 py-0.5 hover:bg-white hover:bg-opacity-25 transition-colors select-none';
+  return (
+    <div
+      className="flex items-center bg-black bg-opacity-60 rounded text-xs font-bold overflow-hidden"
+      data-overlay
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <button
+        className={`${btnClass} rounded-l ${value <= min ? 'opacity-30 cursor-default' : 'cursor-pointer'}`}
+        onClick={(e) => { e.stopPropagation(); if (value > min) onDecrement(); }}
+      >−</button>
+      <span className="text-white px-0.5">{label}{value}</span>
+      <button
+        className={`${btnClass} rounded-r ${value >= max ? 'opacity-30 cursor-default' : 'cursor-pointer'}`}
+        onClick={(e) => { e.stopPropagation(); if (value < max) onIncrement(); }}
+      >+</button>
+    </div>
+  );
 }
 
 /** A photo slot that supports drag-to-pan, scroll-to-zoom, and (in grid mode) editable order/span overlays. */
@@ -34,11 +72,15 @@ function DraggablePhoto({
   onUpdatePhoto,
   gridMode,
   onUpdatePhotoFields,
+  isSelected,
+  onSelectPhoto,
 }: {
   photo: PhotoItem;
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
   gridMode?: boolean;
   onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
+  isSelected?: boolean;
+  onSelectPhoto?: (photoId: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{
@@ -48,14 +90,19 @@ function DraggablePhoto({
     startCropY: number;
   } | null>(null);
 
-  const [editingField, setEditingField] = useState<'priority' | 'colSpan' | 'rowSpan' | null>(null);
-  const [fieldDraft, setFieldDraft] = useState('');
-
   const cropX = photo.cropX ?? 50;
   const cropY = photo.cropY ?? 50;
   const zoom = photo.zoom ?? 1;
   const colSpan = photo.colSpan ?? 1;
   const rowSpan = photo.rowSpan ?? 1;
+
+  const step = (field: 'priority' | 'colSpan' | 'rowSpan', delta: number) => {
+    if (!onUpdatePhotoFields) return;
+    const current = field === 'priority' ? photo.priority : field === 'colSpan' ? colSpan : rowSpan;
+    const max = field === 'priority' ? 99 : field === 'colSpan' ? 3 : 4;
+    const next = Math.max(1, Math.min(max, current + delta));
+    onUpdatePhotoFields(photo.id, { [field]: next });
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!onUpdatePhoto) return;
@@ -80,7 +127,14 @@ function DraggablePhoto({
       onUpdatePhoto(photo.id, newCropX, newCropY);
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (ev: MouseEvent) => {
+      if (dragState.current) {
+        const dx = ev.clientX - dragState.current.startX;
+        const dy = ev.clientY - dragState.current.startY;
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+          onSelectPhoto?.(photo.id);
+        }
+      }
       dragState.current = null;
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -99,27 +153,7 @@ function DraggablePhoto({
     onUpdatePhoto(photo.id, cropX, cropY, Math.round(newZoom * 10) / 10);
   };
 
-  const startEditing = (e: React.MouseEvent, field: 'priority' | 'colSpan' | 'rowSpan') => {
-    e.stopPropagation();
-    if (!onUpdatePhotoFields) return;
-    const val = field === 'priority' ? photo.priority : field === 'colSpan' ? colSpan : rowSpan;
-    setEditingField(field);
-    setFieldDraft(String(val));
-  };
-
-  const commitEdit = (field: typeof editingField) => {
-    if (!field || !onUpdatePhotoFields) return;
-    const val = parseInt(fieldDraft);
-    if (!isNaN(val) && val >= 1) {
-      const max = field === 'priority' ? 99 : field === 'colSpan' ? 3 : 4;
-      onUpdatePhotoFields(photo.id, { [field]: Math.min(val, max) });
-    }
-    setEditingField(null);
-  };
-
   const badgeBase = 'bg-black bg-opacity-60 text-white text-xs font-bold rounded px-1 leading-none py-0.5 select-none';
-  const editableBadge = `${badgeBase} cursor-pointer hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-colors`;
-  const inputClass = 'w-7 h-5 text-xs text-center bg-white border border-blue-400 rounded outline-none font-bold text-gray-800';
 
   return (
     <div
@@ -141,37 +175,27 @@ function DraggablePhoto({
         draggable={false}
       />
 
-      {/* Priority badge — top-left; editable in grid mode */}
-      <div className="absolute top-1 left-1 z-10" data-overlay>
-        {gridMode && editingField === 'priority' ? (
-          <input
-            autoFocus
-            type="number"
+      {/* Selected ring */}
+      {isSelected && (
+        <div className="absolute inset-0 ring-2 ring-inset ring-blue-400 pointer-events-none z-20" />
+      )}
+
+      {/* Priority badge — top-left */}
+      <div className="absolute top-1 left-1 z-10">
+        {gridMode && onUpdatePhotoFields ? (
+          <StepBadge
+            value={photo.priority}
             min={1}
             max={99}
-            value={fieldDraft}
-            onChange={(e) => setFieldDraft(e.target.value)}
-            className={inputClass}
-            onBlur={() => commitEdit('priority')}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter') commitEdit('priority');
-              if (e.key === 'Escape') setEditingField(null);
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
+            onDecrement={() => step('priority', -1)}
+            onIncrement={() => step('priority', 1)}
           />
         ) : (
-          <div
-            className={gridMode && onUpdatePhotoFields ? editableBadge : badgeBase}
-            onClick={gridMode ? (e) => startEditing(e, 'priority') : undefined}
-            title={gridMode ? 'Order in grid (click to edit)' : undefined}
-          >
-            {photo.priority}
-          </div>
+          <div className={badgeBase}>{photo.priority}</div>
         )}
       </div>
 
-      {/* Zoom indicator as magnifying glass — top-right in grid mode, bottom-right otherwise */}
+      {/* Zoom indicator — top-right in grid mode, bottom-right otherwise */}
       {zoom !== 1 && (
         <div
           className={`absolute ${gridMode ? 'top-1 right-1' : 'bottom-1 right-1'} bg-black bg-opacity-60 text-white text-xs rounded px-1 py-0.5 flex items-center gap-0.5 pointer-events-none`}
@@ -185,66 +209,27 @@ function DraggablePhoto({
       )}
 
       {/* Grid-only controls: colSpan (bottom-left) and rowSpan (bottom-right) */}
-      {gridMode && (
+      {gridMode && onUpdatePhotoFields && (
         <>
-          {/* Horizontal span — bottom-left */}
-          <div className="absolute bottom-1 left-1 z-10" data-overlay>
-            {editingField === 'colSpan' ? (
-              <input
-                autoFocus
-                type="number"
-                min={1}
-                max={3}
-                value={fieldDraft}
-                onChange={(e) => setFieldDraft(e.target.value)}
-                className={inputClass}
-                onBlur={() => commitEdit('colSpan')}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter') commitEdit('colSpan');
-                  if (e.key === 'Escape') setEditingField(null);
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <div
-                className={onUpdatePhotoFields ? editableBadge : badgeBase}
-                onClick={(e) => startEditing(e, 'colSpan')}
-                title="Horizontal columns (click to edit)"
-              >
-                ↔{colSpan}
-              </div>
-            )}
+          <div className="absolute bottom-1 left-1 z-10">
+            <StepBadge
+              label="↔"
+              value={colSpan}
+              min={1}
+              max={3}
+              onDecrement={() => step('colSpan', -1)}
+              onIncrement={() => step('colSpan', 1)}
+            />
           </div>
-
-          {/* Vertical span — bottom-right */}
-          <div className="absolute bottom-1 right-1 z-10" data-overlay>
-            {editingField === 'rowSpan' ? (
-              <input
-                autoFocus
-                type="number"
-                min={1}
-                max={4}
-                value={fieldDraft}
-                onChange={(e) => setFieldDraft(e.target.value)}
-                className={inputClass}
-                onBlur={() => commitEdit('rowSpan')}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter') commitEdit('rowSpan');
-                  if (e.key === 'Escape') setEditingField(null);
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <div
-                className={onUpdatePhotoFields ? editableBadge : badgeBase}
-                onClick={(e) => startEditing(e, 'rowSpan')}
-                title="Vertical rows (click to edit)"
-              >
-                ↕{rowSpan}
-              </div>
-            )}
+          <div className="absolute bottom-1 right-1 z-10">
+            <StepBadge
+              label="↕"
+              value={rowSpan}
+              min={1}
+              max={4}
+              onDecrement={() => step('rowSpan', -1)}
+              onIncrement={() => step('rowSpan', 1)}
+            />
           </div>
         </>
       )}
@@ -256,10 +241,14 @@ function FocalPreview({
   photos,
   fillPage,
   onUpdatePhoto,
+  selectedPhotoId,
+  onSelectPhoto,
 }: {
   photos: PhotoItem[];
   fillPage?: boolean;
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+  selectedPhotoId?: string | null;
+  onSelectPhoto?: (photoId: string) => void;
 }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const n = sorted.length;
@@ -321,7 +310,12 @@ function FocalPreview({
           className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}
           style={getPhotoStyle(i)}
         >
-          <DraggablePhoto photo={photo} onUpdatePhoto={onUpdatePhoto} />
+          <DraggablePhoto
+            photo={photo}
+            onUpdatePhoto={onUpdatePhoto}
+            isSelected={selectedPhotoId === photo.id}
+            onSelectPhoto={onSelectPhoto}
+          />
         </div>
       ))}
     </div>
@@ -333,11 +327,15 @@ function GridPreview({
   fillPage,
   onUpdatePhoto,
   onUpdatePhotoFields,
+  selectedPhotoId,
+  onSelectPhoto,
 }: {
   photos: PhotoItem[];
   fillPage?: boolean;
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
   onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
+  selectedPhotoId?: string | null;
+  onSelectPhoto?: (photoId: string) => void;
 }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const gap = fillPage ? '0' : '2px';
@@ -366,6 +364,8 @@ function GridPreview({
             onUpdatePhoto={onUpdatePhoto}
             gridMode
             onUpdatePhotoFields={onUpdatePhotoFields}
+            isSelected={selectedPhotoId === photo.id}
+            onSelectPhoto={onSelectPhoto}
           />
         </div>
       ))}
@@ -378,11 +378,15 @@ function CustomPreview({
   zones,
   fillPage,
   onUpdatePhoto,
+  selectedPhotoId,
+  onSelectPhoto,
 }: {
   photos: PhotoItem[];
   zones: TemplateZone[];
   fillPage?: boolean;
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+  selectedPhotoId?: string | null;
+  onSelectPhoto?: (photoId: string) => void;
 }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const rawZones = [...zones].sort((a, b) => a.priority - b.priority);
@@ -408,7 +412,12 @@ function CustomPreview({
             className="rounded bg-gray-300"
           >
             {photo ? (
-              <DraggablePhoto photo={photo} onUpdatePhoto={onUpdatePhoto} />
+              <DraggablePhoto
+                photo={photo}
+                onUpdatePhoto={onUpdatePhoto}
+                isSelected={selectedPhotoId === photo.id}
+                onSelectPhoto={onSelectPhoto}
+              />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="text-gray-400 text-xs">P{zone.priority}</span>
@@ -426,7 +435,7 @@ function CustomPreview({
   );
 }
 
-export default function PagePreview({ group, customTemplates, onUpdatePhoto, onUpdatePhotoFields }: Props) {
+export default function PagePreview({ group, customTemplates, onUpdatePhoto, onUpdatePhotoFields, selectedPhotoId, onSelectPhoto }: Props) {
   if (group.photos.length === 0) {
     return (
       <div
@@ -448,16 +457,43 @@ export default function PagePreview({ group, customTemplates, onUpdatePhoto, onU
         fillPage={fillPage}
         onUpdatePhoto={onUpdatePhoto}
         onUpdatePhotoFields={onUpdatePhotoFields}
+        selectedPhotoId={selectedPhotoId}
+        onSelectPhoto={onSelectPhoto}
       />
     );
-    if (group.template === 'focal') return <FocalPreview photos={group.photos} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
+    if (group.template === 'focal') return (
+      <FocalPreview
+        photos={group.photos}
+        fillPage={fillPage}
+        onUpdatePhoto={onUpdatePhoto}
+        selectedPhotoId={selectedPhotoId}
+        onSelectPhoto={onSelectPhoto}
+      />
+    );
     // Custom template
     const zones =
       group.templateZones ??
       customTemplates.find((t) => t.id === group.template)?.zones ??
       [];
-    if (zones.length > 0) return <CustomPreview photos={group.photos} zones={zones} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
-    return <FocalPreview photos={group.photos} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
+    if (zones.length > 0) return (
+      <CustomPreview
+        photos={group.photos}
+        zones={zones}
+        fillPage={fillPage}
+        onUpdatePhoto={onUpdatePhoto}
+        selectedPhotoId={selectedPhotoId}
+        onSelectPhoto={onSelectPhoto}
+      />
+    );
+    return (
+      <FocalPreview
+        photos={group.photos}
+        fillPage={fillPage}
+        onUpdatePhoto={onUpdatePhoto}
+        selectedPhotoId={selectedPhotoId}
+        onSelectPhoto={onSelectPhoto}
+      />
+    );
   };
 
   return (
