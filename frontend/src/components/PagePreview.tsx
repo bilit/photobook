@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { PhotoGroup, PhotoItem, TemplateZone, CustomTemplate } from '../types';
 
 // Scale the used zones (those with photos) to fill the full page area
@@ -23,9 +24,89 @@ function fillPageZones(zones: TemplateZone[], photoCount: number): TemplateZone[
 interface Props {
   group: PhotoGroup;
   customTemplates: CustomTemplate[];
+  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
 }
 
-function FocalPreview({ photos, fillPage }: { photos: PhotoItem[]; fillPage?: boolean }) {
+/** A photo slot that supports drag-to-pan when onUpdatePhoto is provided. */
+function DraggablePhoto({
+  photo,
+  onUpdatePhoto,
+}: {
+  photo: PhotoItem;
+  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{
+    startX: number;
+    startY: number;
+    startCropX: number;
+    startCropY: number;
+  } | null>(null);
+
+  const cropX = photo.cropX ?? 50;
+  const cropY = photo.cropY ?? 50;
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!onUpdatePhoto) return;
+    e.preventDefault();
+    dragState.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startCropX: cropX,
+      startCropY: cropY,
+    };
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!dragState.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const dx = ev.clientX - dragState.current.startX;
+      const dy = ev.clientY - dragState.current.startY;
+      // Dragging right = pan left = decrease cropX
+      const newCropX = Math.max(0, Math.min(100, dragState.current.startCropX - (dx / rect.width) * 100));
+      const newCropY = Math.max(0, Math.min(100, dragState.current.startCropY - (dy / rect.height) * 100));
+      onUpdatePhoto(photo.id, newCropX, newCropY);
+    };
+
+    const handleMouseUp = () => {
+      dragState.current = null;
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full relative"
+      onMouseDown={handleMouseDown}
+      style={{ cursor: onUpdatePhoto ? (dragState.current ? 'grabbing' : 'grab') : 'default' }}
+    >
+      <img
+        src={photo.thumbnailUrl}
+        alt={photo.filename}
+        className="w-full h-full object-cover"
+        style={{ objectPosition: `${cropX}% ${cropY}%` }}
+        draggable={false}
+      />
+      <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
+        {photo.priority}
+      </div>
+    </div>
+  );
+}
+
+function FocalPreview({
+  photos,
+  fillPage,
+  onUpdatePhoto,
+}: {
+  photos: PhotoItem[];
+  fillPage?: boolean;
+  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+}) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const n = sorted.length;
 
@@ -86,17 +167,22 @@ function FocalPreview({ photos, fillPage }: { photos: PhotoItem[]; fillPage?: bo
           className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}
           style={getPhotoStyle(i)}
         >
-          <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-contain" />
-          <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
-            {photo.priority}
-          </div>
+          <DraggablePhoto photo={photo} onUpdatePhoto={onUpdatePhoto} />
         </div>
       ))}
     </div>
   );
 }
 
-function GridPreview({ photos, fillPage }: { photos: PhotoItem[]; fillPage?: boolean }) {
+function GridPreview({
+  photos,
+  fillPage,
+  onUpdatePhoto,
+}: {
+  photos: PhotoItem[];
+  fillPage?: boolean;
+  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+}) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const n = sorted.length;
   const cols = Math.ceil(Math.sqrt(n));
@@ -109,17 +195,24 @@ function GridPreview({ photos, fillPage }: { photos: PhotoItem[]; fillPage?: boo
     >
       {sorted.map((photo) => (
         <div key={photo.id} className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}>
-          <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-contain" />
-          <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
-            {photo.priority}
-          </div>
+          <DraggablePhoto photo={photo} onUpdatePhoto={onUpdatePhoto} />
         </div>
       ))}
     </div>
   );
 }
 
-function CustomPreview({ photos, zones, fillPage }: { photos: PhotoItem[]; zones: TemplateZone[]; fillPage?: boolean }) {
+function CustomPreview({
+  photos,
+  zones,
+  fillPage,
+  onUpdatePhoto,
+}: {
+  photos: PhotoItem[];
+  zones: TemplateZone[];
+  fillPage?: boolean;
+  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+}) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const rawZones = [...zones].sort((a, b) => a.priority - b.priority);
   const sortedZones = fillPage && sorted.length < rawZones.length
@@ -144,12 +237,7 @@ function CustomPreview({ photos, zones, fillPage }: { photos: PhotoItem[]; zones
             className="rounded bg-gray-300"
           >
             {photo ? (
-              <>
-                <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-contain" />
-                <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
-                  {photo.priority}
-                </div>
-              </>
+              <DraggablePhoto photo={photo} onUpdatePhoto={onUpdatePhoto} />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <span className="text-gray-400 text-xs">P{zone.priority}</span>
@@ -167,7 +255,7 @@ function CustomPreview({ photos, zones, fillPage }: { photos: PhotoItem[]; zones
   );
 }
 
-export default function PagePreview({ group, customTemplates }: Props) {
+export default function PagePreview({ group, customTemplates, onUpdatePhoto }: Props) {
   if (group.photos.length === 0) {
     return (
       <div
@@ -185,15 +273,15 @@ export default function PagePreview({ group, customTemplates }: Props) {
   const paddingClass = isBuiltIn && fillPage ? 'p-0' : 'p-1';
 
   const renderLayout = () => {
-    if (group.template === 'grid') return <GridPreview photos={group.photos} fillPage={fillPage} />;
-    if (group.template === 'focal') return <FocalPreview photos={group.photos} fillPage={fillPage} />;
+    if (group.template === 'grid') return <GridPreview photos={group.photos} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
+    if (group.template === 'focal') return <FocalPreview photos={group.photos} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
     // Custom template
     const zones =
       group.templateZones ??
       customTemplates.find((t) => t.id === group.template)?.zones ??
       [];
-    if (zones.length > 0) return <CustomPreview photos={group.photos} zones={zones} fillPage={fillPage} />;
-    return <FocalPreview photos={group.photos} fillPage={fillPage} />;
+    if (zones.length > 0) return <CustomPreview photos={group.photos} zones={zones} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
+    return <FocalPreview photos={group.photos} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
   };
 
   return (

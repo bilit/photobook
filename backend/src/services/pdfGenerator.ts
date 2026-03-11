@@ -19,6 +19,8 @@ interface PhotoItem {
   width: number;
   height: number;
   priority: number;
+  cropX?: number; // 0-100, default 50
+  cropY?: number; // 0-100, default 50
 }
 
 interface PhotoGroup {
@@ -69,7 +71,9 @@ function buildPhotoSlots(photos: PhotoItem[]): string {
   return photos
     .map((photo, i) => {
       const imgUrl = photo.id.startsWith('local-') ? photo.url : `${photo.url}=w2000-h2000`;
-      return `<div class="photo-slot photo-${i}"><img src="${imgUrl}" alt="${photo.filename}" /></div>`;
+      const cropX = photo.cropX ?? 50;
+      const cropY = photo.cropY ?? 50;
+      return `<div class="photo-slot photo-${i}"><img src="${imgUrl}" alt="${photo.filename}" style="object-position:${cropX}% ${cropY}%" /></div>`;
     })
     .join('\n    ');
 }
@@ -149,7 +153,9 @@ function renderCustomTemplate(group: PhotoGroup, baseCSS: string): string {
       const photo = sorted[i];
       if (!photo) return `<div class="zone-${i}"></div>`;
       const imgUrl = photo.id.startsWith('local-') ? photo.url : `${photo.url}=w2000-h2000`;
-      return `<div class="zone-${i}"><img src="${imgUrl}" alt="${photo.filename}" style="width:100%;height:100%;object-fit:cover;" /></div>`;
+      const cropX = photo.cropX ?? 50;
+      const cropY = photo.cropY ?? 50;
+      return `<div class="zone-${i}"><img src="${imgUrl}" alt="${photo.filename}" style="width:100%;height:100%;object-fit:cover;object-position:${cropX}% ${cropY}%;" /></div>`;
     })
     .join('\n    ');
 

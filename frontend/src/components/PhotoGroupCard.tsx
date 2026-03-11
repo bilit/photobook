@@ -53,6 +53,11 @@ export default function PhotoGroupCard({
     update({ photos });
   };
 
+  const updatePhotoCrop = (photoId: string, cropX: number, cropY: number) => {
+    const photos = group.photos.map((p) => (p.id === photoId ? { ...p, cropX, cropY } : p));
+    update({ photos });
+  };
+
   const handleAssignPhotos = (selected: PhotoItem[]) => {
     // Re-assign priorities in order, preserving existing priority order for photos already on the page
     const existingPriorities = new Map(group.photos.map((p) => [p.id, p.priority]));
@@ -214,7 +219,8 @@ export default function PhotoGroupCard({
             {/* Right: live preview */}
             <div className="w-full sm:w-40 sm:flex-shrink-0">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-center">Preview</p>
-              <PagePreview group={group} customTemplates={customTemplates} />
+              <PagePreview group={group} customTemplates={customTemplates} onUpdatePhoto={updatePhotoCrop} />
+              <p className="text-xs text-gray-400 text-center mt-1">Drag photos to reposition</p>
             </div>
           </div>
         )}

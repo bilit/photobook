@@ -23,6 +23,8 @@ export interface PhotoItem {
   width: number;
   height: number;
   priority: number;
+  cropX?: number; // 0-100, default 50 (center)
+  cropY?: number; // 0-100, default 50 (center)
 }
 
 export interface PhotoGroup {
