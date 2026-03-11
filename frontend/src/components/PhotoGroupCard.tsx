@@ -217,7 +217,7 @@ export default function PhotoGroupCard({
             </div>
 
             {/* Right: live preview */}
-            <div className="w-full sm:w-40 sm:flex-shrink-0">
+            <div className="w-full sm:w-72 md:w-96 sm:flex-shrink-0">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-center">Preview</p>
               <PagePreview group={group} customTemplates={customTemplates} onUpdatePhoto={updatePhotoCrop} />
               <p className="text-xs text-gray-400 text-center mt-1">Drag photos to reposition</p>
