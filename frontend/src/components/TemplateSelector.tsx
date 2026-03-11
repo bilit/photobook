@@ -6,6 +6,7 @@ interface Props {
   customTemplates: CustomTemplate[];
   onCreateTemplate: () => void;
   onDeleteTemplate: (id: string) => void;
+  onEditTemplate: (template: CustomTemplate) => void;
 }
 
 const BUILT_IN = [
@@ -19,6 +20,7 @@ export default function TemplateSelector({
   customTemplates,
   onCreateTemplate,
   onDeleteTemplate,
+  onEditTemplate,
 }: Props) {
   return (
     <div className="flex flex-wrap gap-2 items-center">
@@ -52,6 +54,18 @@ export default function TemplateSelector({
             <span>⊡</span>
             {t.name}
           </button>
+          {/* Edit button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditTemplate(t);
+            }}
+            className="absolute -top-1.5 -left-1.5 w-4 h-4 bg-blue-500 text-white rounded-full text-xs hidden group-hover:flex items-center justify-center leading-none shadow"
+            title="Edit template"
+          >
+            ✎
+          </button>
+          {/* Delete button */}
           <button
             onClick={(e) => {
               e.stopPropagation();

@@ -26,6 +26,7 @@ interface PhotoGroup {
   name: string;
   template: string; // 'focal' | 'grid' | custom template id
   templateZones?: TemplateZone[];
+  fillPage?: boolean;
   photos: PhotoItem[];
 }
 
@@ -35,6 +36,26 @@ interface PhotoBook {
 }
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
+
+// Scale the used zones (those with photos) to fill the full page area
+function fillPageZones(zones: TemplateZone[], photoCount: number): TemplateZone[] {
+  const used = zones.slice(0, photoCount);
+  if (used.length === 0) return zones;
+  const minX = Math.min(...used.map((z) => z.x));
+  const minY = Math.min(...used.map((z) => z.y));
+  const maxX = Math.max(...used.map((z) => z.x + z.width));
+  const maxY = Math.max(...used.map((z) => z.y + z.height));
+  const rangeX = maxX - minX;
+  const rangeY = maxY - minY;
+  if (rangeX === 0 || rangeY === 0) return used;
+  return used.map((z) => ({
+    ...z,
+    x: ((z.x - minX) / rangeX) * 100,
+    y: ((z.y - minY) / rangeY) * 100,
+    width: (z.width / rangeX) * 100,
+    height: (z.height / rangeY) * 100,
+  }));
+}
 
 function loadTemplate(name: string): string {
   return fs.readFileSync(path.join(TEMPLATES_DIR, `${name}.html`), 'utf-8');
@@ -89,8 +110,11 @@ function renderGridTemplate(group: PhotoGroup, baseCSS: string): string {
 }
 
 function renderCustomTemplate(group: PhotoGroup, baseCSS: string): string {
-  const zones = [...(group.templateZones || [])].sort((a, b) => a.priority - b.priority);
+  const rawZones = [...(group.templateZones || [])].sort((a, b) => a.priority - b.priority);
   const sorted = [...group.photos].sort((a, b) => a.priority - b.priority);
+  const zones = group.fillPage && sorted.length < rawZones.length
+    ? fillPageZones(rawZones, sorted.length)
+    : rawZones;
   const hasTitle = group.name && group.name.trim() !== '';
 
   // Build absolute-positioned zone CSS
@@ -162,7 +186,8 @@ async function renderPageToPdf(html: string, browser: Browser): Promise<Buffer> 
   try {
     await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
     const pdf = await page.pdf({
-      format: 'A4',
+      width: '11in',
+      height: '8.5in',
       printBackground: true,
       margin: { top: 0, right: 0, bottom: 0, left: 0 },
     });

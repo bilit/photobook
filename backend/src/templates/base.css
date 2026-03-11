@@ -5,16 +5,16 @@
 }
 
 body {
-  width: 210mm;
-  height: 297mm;
+  width: 279.4mm;
+  height: 215.9mm;
   overflow: hidden;
   font-family: sans-serif;
   background: white;
 }
 
 .page {
-  width: 210mm;
-  height: 297mm;
+  width: 279.4mm;
+  height: 215.9mm;
   padding: 8mm;
   display: flex;
   flex-direction: column;
