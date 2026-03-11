@@ -378,9 +378,37 @@ export default function EditorPage({ user }: Props) {
                   </div>
                 </div>
 
-                <p className="flex-shrink-0 text-xs text-gray-400 text-center pb-3">
-                  Drag to reposition · Scroll to zoom{selectedGroup.template === 'grid' ? ' · Click badges to edit order/span' : ''}
+                <p className="flex-shrink-0 text-xs text-gray-400 text-center">
+                  Drag to reposition{selectedGroup.template === 'grid' ? ' · Click badges to edit order/span' : ''}
                 </p>
+
+                {/* Per-photo zoom sliders */}
+                {selectedGroup.photos.length > 0 && (
+                  <div className="flex-shrink-0 px-4 pb-3 pt-1">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center">
+                      {[...selectedGroup.photos]
+                        .sort((a, b) => a.priority - b.priority)
+                        .map((photo) => (
+                          <div key={photo.id} className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-xs text-gray-400 flex-shrink-0 w-4 text-center font-mono">{photo.priority}</span>
+                            <input
+                              type="range"
+                              min={0.5}
+                              max={4}
+                              step={0.1}
+                              value={photo.zoom ?? 1}
+                              onChange={(e) => updatePhotoCrop(photo.id, photo.cropX ?? 50, photo.cropY ?? 50, parseFloat(e.target.value))}
+                              className="w-20 h-1 accent-blue-500 cursor-pointer"
+                              title={`Photo ${photo.priority} zoom: ${(photo.zoom ?? 1).toFixed(1)}×`}
+                            />
+                            <span className="text-xs text-gray-400 flex-shrink-0 w-7 font-mono">
+                              {(photo.zoom ?? 1).toFixed(1)}×
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </>
             ) : null}
           </div>
