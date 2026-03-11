@@ -34,8 +34,8 @@ export default function PhotoLibrary({ importedPhotos, pagePhotos, onAssign, onC
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-xl shadow-2xl flex flex-col" style={{ width: '75vw', maxWidth: 900, maxHeight: '85vh' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 sm:p-4">
+      <div className="bg-white flex flex-col w-full h-full sm:rounded-xl sm:shadow-2xl sm:w-[90vw] sm:max-w-[900px] sm:max-h-[85vh] sm:h-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <div>
             <h2 className="text-lg font-bold text-gray-800">Photo Library</h2>
@@ -59,7 +59,7 @@ export default function PhotoLibrary({ importedPhotos, pagePhotos, onAssign, onC
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-5">
-            <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-8 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 lg:grid-cols-8 gap-2">
               {importedPhotos.map((photo) => {
                 const isSelected = selected.has(photo.id);
                 const wasOnPage = pagePhotoIds.has(photo.id);
