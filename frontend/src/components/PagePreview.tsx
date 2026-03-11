@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { PhotoGroup, PhotoItem, TemplateZone, CustomTemplate } from '../types';
 
 // Scale the used zones (those with photos) to fill the full page area
@@ -25,15 +25,20 @@ interface Props {
   group: PhotoGroup;
   customTemplates: CustomTemplate[];
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
+  onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
 }
 
-/** A photo slot that supports drag-to-pan and scroll-to-zoom when onUpdatePhoto is provided. */
+/** A photo slot that supports drag-to-pan, scroll-to-zoom, and (in grid mode) editable order/span overlays. */
 function DraggablePhoto({
   photo,
   onUpdatePhoto,
+  gridMode,
+  onUpdatePhotoFields,
 }: {
   photo: PhotoItem;
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
+  gridMode?: boolean;
+  onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{
@@ -43,12 +48,19 @@ function DraggablePhoto({
     startCropY: number;
   } | null>(null);
 
+  const [editingField, setEditingField] = useState<'priority' | 'colSpan' | 'rowSpan' | null>(null);
+  const [fieldDraft, setFieldDraft] = useState('');
+
   const cropX = photo.cropX ?? 50;
   const cropY = photo.cropY ?? 50;
   const zoom = photo.zoom ?? 1;
+  const colSpan = photo.colSpan ?? 1;
+  const rowSpan = photo.rowSpan ?? 1;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!onUpdatePhoto) return;
+    // Don't start drag when clicking on overlay controls
+    if ((e.target as HTMLElement).closest('[data-overlay]')) return;
     e.preventDefault();
     dragState.current = {
       startX: e.clientX,
@@ -87,6 +99,28 @@ function DraggablePhoto({
     onUpdatePhoto(photo.id, cropX, cropY, Math.round(newZoom * 10) / 10);
   };
 
+  const startEditing = (e: React.MouseEvent, field: 'priority' | 'colSpan' | 'rowSpan') => {
+    e.stopPropagation();
+    if (!onUpdatePhotoFields) return;
+    const val = field === 'priority' ? photo.priority : field === 'colSpan' ? colSpan : rowSpan;
+    setEditingField(field);
+    setFieldDraft(String(val));
+  };
+
+  const commitEdit = (field: typeof editingField) => {
+    if (!field || !onUpdatePhotoFields) return;
+    const val = parseInt(fieldDraft);
+    if (!isNaN(val) && val >= 1) {
+      const max = field === 'priority' ? 99 : field === 'colSpan' ? 3 : 4;
+      onUpdatePhotoFields(photo.id, { [field]: Math.min(val, max) });
+    }
+    setEditingField(null);
+  };
+
+  const badgeBase = 'bg-black bg-opacity-60 text-white text-xs font-bold rounded px-1 leading-none py-0.5 select-none';
+  const editableBadge = `${badgeBase} cursor-pointer hover:bg-white hover:bg-opacity-90 hover:text-gray-800 transition-colors`;
+  const inputClass = 'w-7 h-5 text-xs text-center bg-white border border-blue-400 rounded outline-none font-bold text-gray-800';
+
   return (
     <div
       ref={containerRef}
@@ -106,13 +140,113 @@ function DraggablePhoto({
         }}
         draggable={false}
       />
-      <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
-        {photo.priority}
+
+      {/* Priority badge — top-left; editable in grid mode */}
+      <div className="absolute top-1 left-1 z-10" data-overlay>
+        {gridMode && editingField === 'priority' ? (
+          <input
+            autoFocus
+            type="number"
+            min={1}
+            max={99}
+            value={fieldDraft}
+            onChange={(e) => setFieldDraft(e.target.value)}
+            className={inputClass}
+            onBlur={() => commitEdit('priority')}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') commitEdit('priority');
+              if (e.key === 'Escape') setEditingField(null);
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <div
+            className={gridMode && onUpdatePhotoFields ? editableBadge : badgeBase}
+            onClick={gridMode ? (e) => startEditing(e, 'priority') : undefined}
+            title={gridMode ? 'Order in grid (click to edit)' : undefined}
+          >
+            {photo.priority}
+          </div>
+        )}
       </div>
+
+      {/* Zoom indicator as magnifying glass — top-right in grid mode, bottom-right otherwise */}
       {zoom !== 1 && (
-        <div className="absolute bottom-1 right-1 bg-black bg-opacity-50 text-white text-xs rounded px-1">
-          {zoom.toFixed(1)}×
+        <div
+          className={`absolute ${gridMode ? 'top-1 right-1' : 'bottom-1 right-1'} bg-black bg-opacity-60 text-white text-xs rounded px-1 py-0.5 flex items-center gap-0.5 pointer-events-none`}
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="flex-shrink-0">
+            <circle cx="4" cy="4" r="3" stroke="white" strokeWidth="1.5"/>
+            <line x1="6.5" y1="6.5" x2="9" y2="9" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <span>{zoom.toFixed(1)}×</span>
         </div>
+      )}
+
+      {/* Grid-only controls: colSpan (bottom-left) and rowSpan (bottom-right) */}
+      {gridMode && (
+        <>
+          {/* Horizontal span — bottom-left */}
+          <div className="absolute bottom-1 left-1 z-10" data-overlay>
+            {editingField === 'colSpan' ? (
+              <input
+                autoFocus
+                type="number"
+                min={1}
+                max={3}
+                value={fieldDraft}
+                onChange={(e) => setFieldDraft(e.target.value)}
+                className={inputClass}
+                onBlur={() => commitEdit('colSpan')}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') commitEdit('colSpan');
+                  if (e.key === 'Escape') setEditingField(null);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <div
+                className={onUpdatePhotoFields ? editableBadge : badgeBase}
+                onClick={(e) => startEditing(e, 'colSpan')}
+                title="Horizontal columns (click to edit)"
+              >
+                ↔{colSpan}
+              </div>
+            )}
+          </div>
+
+          {/* Vertical span — bottom-right */}
+          <div className="absolute bottom-1 right-1 z-10" data-overlay>
+            {editingField === 'rowSpan' ? (
+              <input
+                autoFocus
+                type="number"
+                min={1}
+                max={4}
+                value={fieldDraft}
+                onChange={(e) => setFieldDraft(e.target.value)}
+                className={inputClass}
+                onBlur={() => commitEdit('rowSpan')}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') commitEdit('rowSpan');
+                  if (e.key === 'Escape') setEditingField(null);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <div
+                className={onUpdatePhotoFields ? editableBadge : badgeBase}
+                onClick={(e) => startEditing(e, 'rowSpan')}
+                title="Vertical rows (click to edit)"
+              >
+                ↕{rowSpan}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
@@ -198,24 +332,41 @@ function GridPreview({
   photos,
   fillPage,
   onUpdatePhoto,
+  onUpdatePhotoFields,
 }: {
   photos: PhotoItem[];
   fillPage?: boolean;
-  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
+  onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
+  onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
 }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
-  const n = sorted.length;
-  const cols = Math.ceil(Math.sqrt(n));
   const gap = fillPage ? '0' : '2px';
 
   return (
     <div
       className="w-full h-full grid"
-      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: '1fr', gap }}
+      style={{
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateRows: 'repeat(4, 1fr)',
+        gridAutoFlow: 'dense',
+        gap,
+      }}
     >
       {sorted.map((photo) => (
-        <div key={photo.id} className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}>
-          <DraggablePhoto photo={photo} onUpdatePhoto={onUpdatePhoto} />
+        <div
+          key={photo.id}
+          className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}
+          style={{
+            gridColumn: `span ${Math.min(photo.colSpan ?? 1, 3)}`,
+            gridRow: `span ${Math.min(photo.rowSpan ?? 1, 4)}`,
+          }}
+        >
+          <DraggablePhoto
+            photo={photo}
+            onUpdatePhoto={onUpdatePhoto}
+            gridMode
+            onUpdatePhotoFields={onUpdatePhotoFields}
+          />
         </div>
       ))}
     </div>
@@ -275,7 +426,7 @@ function CustomPreview({
   );
 }
 
-export default function PagePreview({ group, customTemplates, onUpdatePhoto }: Props) {
+export default function PagePreview({ group, customTemplates, onUpdatePhoto, onUpdatePhotoFields }: Props) {
   if (group.photos.length === 0) {
     return (
       <div
@@ -291,7 +442,14 @@ export default function PagePreview({ group, customTemplates, onUpdatePhoto }: P
   const paddingClass = fillPage ? 'p-0' : 'p-1';
 
   const renderLayout = () => {
-    if (group.template === 'grid') return <GridPreview photos={group.photos} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
+    if (group.template === 'grid') return (
+      <GridPreview
+        photos={group.photos}
+        fillPage={fillPage}
+        onUpdatePhoto={onUpdatePhoto}
+        onUpdatePhotoFields={onUpdatePhotoFields}
+      />
+    );
     if (group.template === 'focal') return <FocalPreview photos={group.photos} fillPage={fillPage} onUpdatePhoto={onUpdatePhoto} />;
     // Custom template
     const zones =

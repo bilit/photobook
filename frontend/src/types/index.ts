@@ -23,9 +23,11 @@ export interface PhotoItem {
   width: number;
   height: number;
   priority: number;
-  cropX?: number; // 0-100, default 50 (center)
-  cropY?: number; // 0-100, default 50 (center)
-  zoom?: number;  // 1.0 = default fill, >1 = zoomed in, <1 = zoomed out
+  cropX?: number;   // 0-100, default 50 (center)
+  cropY?: number;   // 0-100, default 50 (center)
+  zoom?: number;    // 1.0 = default fill, >1 = zoomed in, <1 = zoomed out
+  colSpan?: number; // grid column span (1-3), default 1
+  rowSpan?: number; // grid row span (1-4), default 1
 }
 
 export interface PhotoGroup {
