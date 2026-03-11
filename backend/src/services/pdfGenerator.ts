@@ -225,19 +225,8 @@ export async function generatePhotobook(book: PhotoBook): Promise<Buffer> {
       '--disable-gpu',
     ],
   };
-  const chromiumPaths = [
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    '/usr/bin/chromium-browser',
-    '/usr/bin/chromium',
-    '/usr/bin/google-chrome',
-    '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome',
-  ];
-  const executablePath = chromiumPaths.find(p => {
-    if (!p) return false;
-    try { require('fs').accessSync(p, require('fs').constants.X_OK); return true; } catch { return false; }
-  });
-  if (executablePath) {
-    launchOptions.executablePath = executablePath;
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   }
   const browser = await puppeteer.launch(launchOptions);
 
