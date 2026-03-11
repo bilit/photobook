@@ -35,6 +35,7 @@ export async function getPickerItems(
 
   const items: PhotoItem[] = (data.mediaItems || []).map((item: {
     id: string;
+    createTime?: string;
     mediaFile: {
       baseUrl: string;
       filename: string;
@@ -48,6 +49,7 @@ export async function getPickerItems(
     width: item.mediaFile.mediaFileMetadata?.width || 0,
     height: item.mediaFile.mediaFileMetadata?.height || 0,
     priority: 1,
+    createdAt: item.createTime,
   }));
 
   return { items, nextPageToken: data.nextPageToken };
