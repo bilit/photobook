@@ -219,7 +219,6 @@ export default function PhotoGroupCard({
                       photo={photo}
                       onPriorityChange={changePriority}
                       onRemove={removePhoto}
-                      onZoomChange={changeZoom}
                     />
                   ))}
                 </div>
