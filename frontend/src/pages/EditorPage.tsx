@@ -162,6 +162,18 @@ export default function EditorPage({ user }: Props) {
     }));
   };
 
+  const updatePhotoFields = (photoId: string, fields: Partial<PhotoItem>) => {
+    if (!selectedGroupId) return;
+    setBook((b) => ({
+      ...b,
+      groups: b.groups.map((g) =>
+        g.id === selectedGroupId
+          ? { ...g, photos: g.photos.map((p) => (p.id === photoId ? { ...p, ...fields } : p)) }
+          : g
+      ),
+    }));
+  };
+
   const handleGeneratePdf = async () => {
     if (book.groups.length === 0) return;
     setGenerating(true);
@@ -361,12 +373,13 @@ export default function EditorPage({ user }: Props) {
                       group={selectedGroup}
                       customTemplates={customTemplates}
                       onUpdatePhoto={updatePhotoCrop}
+                      onUpdatePhotoFields={updatePhotoFields}
                     />
                   </div>
                 </div>
 
                 <p className="flex-shrink-0 text-xs text-gray-400 text-center pb-3">
-                  Drag photos to reposition crop
+                  Drag to reposition · Scroll to zoom{selectedGroup.template === 'grid' ? ' · Click badges to edit order/span' : ''}
                 </p>
               </>
             ) : null}
