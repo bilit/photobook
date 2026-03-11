@@ -7,6 +7,7 @@ import PhotoLibrary from './PhotoLibrary';
 import TemplateBuilder from './TemplateBuilder';
 import { deleteTemplate } from '../templateStore';
 
+
 interface Props {
   group: PhotoGroup;
   pageNumber: number;
@@ -31,6 +32,7 @@ export default function PhotoGroupCard({
   const [collapsed, setCollapsed] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<CustomTemplate | null>(null);
 
   const update = (patch: Partial<PhotoGroup>) => {
     onUpdate({ ...group, ...patch });
@@ -78,6 +80,19 @@ export default function PhotoGroupCard({
     onTemplatesChange();
     if (group.template === id) {
       update({ template: 'focal', templateZones: undefined });
+    }
+  };
+
+  const handleEditTemplate = (template: CustomTemplate) => {
+    setEditingTemplate(template);
+    setShowBuilder(true);
+  };
+
+  const handleBuilderSave = (saved: CustomTemplate) => {
+    onTemplatesChange();
+    // If this page uses the edited template, refresh its zones
+    if (group.template === saved.id) {
+      update({ templateZones: saved.zones });
     }
   };
 
@@ -144,9 +159,24 @@ export default function PhotoGroupCard({
                   value={group.template}
                   onChange={handleTemplateChange}
                   customTemplates={customTemplates}
-                  onCreateTemplate={() => setShowBuilder(true)}
+                  onCreateTemplate={() => { setEditingTemplate(null); setShowBuilder(true); }}
                   onDeleteTemplate={handleDeleteTemplate}
+                  onEditTemplate={handleEditTemplate}
                 />
+              </div>
+
+              <div className="flex items-center gap-3 mb-3 flex-wrap">
+                <button
+                  onClick={() => update({ fillPage: !group.fillPage })}
+                  title="Scale photos to fill the full page even when fewer than template zones"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                    group.fillPage
+                      ? 'bg-green-600 text-white border-green-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-green-300 hover:text-green-600'
+                  }`}
+                >
+                  ⤢ Fill Page
+                </button>
               </div>
 
               <div className="flex items-center gap-3 mb-3">
@@ -201,8 +231,9 @@ export default function PhotoGroupCard({
 
       {showBuilder && (
         <TemplateBuilder
-          onSave={() => onTemplatesChange()}
-          onClose={() => setShowBuilder(false)}
+          onSave={handleBuilderSave}
+          onClose={() => { setShowBuilder(false); setEditingTemplate(null); }}
+          initialTemplate={editingTemplate ?? undefined}
         />
       )}
     </>

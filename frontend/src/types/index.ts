@@ -30,6 +30,7 @@ export interface PhotoGroup {
   name: string;
   template: TemplateType;
   templateZones?: TemplateZone[]; // populated when template is a custom template ID
+  fillPage?: boolean; // scale zones to fill page when fewer photos than zones
   photos: PhotoItem[];
 }
 

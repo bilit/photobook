@@ -1,5 +1,25 @@
 import type { PhotoGroup, PhotoItem, TemplateZone, CustomTemplate } from '../types';
 
+// Scale the used zones (those with photos) to fill the full page area
+function fillPageZones(zones: TemplateZone[], photoCount: number): TemplateZone[] {
+  const used = zones.slice(0, photoCount);
+  if (used.length === 0) return zones;
+  const minX = Math.min(...used.map((z) => z.x));
+  const minY = Math.min(...used.map((z) => z.y));
+  const maxX = Math.max(...used.map((z) => z.x + z.width));
+  const maxY = Math.max(...used.map((z) => z.y + z.height));
+  const rangeX = maxX - minX;
+  const rangeY = maxY - minY;
+  if (rangeX === 0 || rangeY === 0) return used;
+  return used.map((z) => ({
+    ...z,
+    x: ((z.x - minX) / rangeX) * 100,
+    y: ((z.y - minY) / rangeY) * 100,
+    width: (z.width / rangeX) * 100,
+    height: (z.height / rangeY) * 100,
+  }));
+}
+
 interface Props {
   group: PhotoGroup;
   customTemplates: CustomTemplate[];
@@ -96,9 +116,12 @@ function GridPreview({ photos }: { photos: PhotoItem[] }) {
   );
 }
 
-function CustomPreview({ photos, zones }: { photos: PhotoItem[]; zones: TemplateZone[] }) {
+function CustomPreview({ photos, zones, fillPage }: { photos: PhotoItem[]; zones: TemplateZone[]; fillPage?: boolean }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
-  const sortedZones = [...zones].sort((a, b) => a.priority - b.priority);
+  const rawZones = [...zones].sort((a, b) => a.priority - b.priority);
+  const sortedZones = fillPage && sorted.length < rawZones.length
+    ? fillPageZones(rawZones, sorted.length)
+    : rawZones;
 
   return (
     <div className="w-full h-full relative bg-gray-100 rounded">
@@ -146,7 +169,7 @@ export default function PagePreview({ group, customTemplates }: Props) {
     return (
       <div
         className="w-full flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200"
-        style={{ aspectRatio: '210/297' }}
+        style={{ aspectRatio: '11/8.5' }}
       >
         <p className="text-gray-300 text-xs">No photos</p>
       </div>
@@ -161,14 +184,14 @@ export default function PagePreview({ group, customTemplates }: Props) {
       group.templateZones ??
       customTemplates.find((t) => t.id === group.template)?.zones ??
       [];
-    if (zones.length > 0) return <CustomPreview photos={group.photos} zones={zones} />;
+    if (zones.length > 0) return <CustomPreview photos={group.photos} zones={zones} fillPage={group.fillPage} />;
     return <FocalPreview photos={group.photos} />;
   };
 
   return (
     <div
       className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm"
-      style={{ aspectRatio: '210/297' }}
+      style={{ aspectRatio: '11/8.5' }}
     >
       {group.name && (
         <div className="px-2 py-1 border-b border-gray-100 text-xs font-semibold text-gray-600 text-center truncate">

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { TemplateZone, CustomTemplate } from '../types';
-import { saveTemplate } from '../templateStore';
+import { saveTemplate, updateTemplate } from '../templateStore';
 
 type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
 
@@ -157,8 +157,14 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
       alert('Please draw at least one zone on the canvas.');
       return;
     }
-    const template = saveTemplate(templateName, zones);
-    onSave(template);
+    if (initialTemplate) {
+      const updated = { ...initialTemplate, name: templateName.trim() || 'My Template', zones };
+      updateTemplate(updated);
+      onSave(updated);
+    } else {
+      const template = saveTemplate(templateName, zones);
+      onSave(template);
+    }
     onClose();
   };
 
@@ -174,7 +180,7 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-800">Template Builder</h2>
+            <h2 className="text-lg font-bold text-gray-800">{initialTemplate ? 'Edit Template' : 'Template Builder'}</h2>
             <p className="text-xs text-gray-400 mt-0.5">
               Click and drag on the page to draw photo zones. Drag to move, drag handles to resize.
             </p>
@@ -187,7 +193,7 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
         <div className="flex flex-1 overflow-hidden">
           {/* Canvas area */}
           <div className="flex-1 bg-gray-100 flex items-center justify-center p-6 overflow-hidden">
-            {/* A4 canvas */}
+            {/* 8.5x11 landscape canvas */}
             <div
               ref={canvasRef}
               onMouseDown={handleCanvasMouseDown}
@@ -196,7 +202,7 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
               onMouseLeave={handleMouseUp}
               className="bg-white shadow-xl relative select-none flex-shrink-0"
               style={{
-                aspectRatio: '210 / 297',
+                aspectRatio: '11 / 8.5',
                 height: '100%',
                 maxHeight: '100%',
                 cursor: 'crosshair',
@@ -401,7 +407,7 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
               onClick={handleSave}
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm flex-shrink-0"
             >
-              Save Template
+              {initialTemplate ? 'Update Template' : 'Save Template'}
             </button>
           </div>
         </div>
