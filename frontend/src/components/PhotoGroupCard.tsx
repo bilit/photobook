@@ -112,6 +112,35 @@ export default function PhotoGroupCard({
 
   const sortedPhotos = [...group.photos].sort((a, b) => a.priority - b.priority);
 
+  // Group assigned photos by date for display
+  const photosByDay = (() => {
+    const groups: { label: string; photos: PhotoItem[] }[] = [];
+    const seen = new Map<string, PhotoItem[]>();
+    // Sort by date descending within each group, but keep priority ordering stable
+    const byDate = [...sortedPhotos].sort((a, b) => {
+      if (!a.createdAt && !b.createdAt) return a.priority - b.priority;
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+      const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return diff !== 0 ? diff : a.priority - b.priority;
+    });
+    for (const photo of byDate) {
+      let label = 'Unknown date';
+      if (photo.createdAt) {
+        const d = new Date(photo.createdAt);
+        label = d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      }
+      if (!seen.has(label)) {
+        seen.set(label, []);
+        groups.push({ label, photos: seen.get(label)! });
+      }
+      seen.get(label)!.push(photo);
+    }
+    return groups;
+  })();
+
+  const useDateGroups = photosByDay.length > 1 || (photosByDay.length === 1 && photosByDay[0].label !== 'Unknown date');
+
   return (
     <>
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -210,6 +239,24 @@ export default function PhotoGroupCard({
               {sortedPhotos.length === 0 ? (
                 <div className="flex items-center justify-center py-8 border-2 border-dashed border-gray-200 rounded-lg text-gray-300 text-sm">
                   No photos — click "Add Photos" to assign from library
+                </div>
+              ) : useDateGroups ? (
+                <div className="space-y-3">
+                  {photosByDay.map(({ label, photos }) => (
+                    <div key={label}>
+                      <p className="text-xs font-semibold text-gray-400 mb-1">{label}</p>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
+                        {photos.map((photo: PhotoItem) => (
+                          <PhotoThumbnail
+                            key={photo.id}
+                            photo={photo}
+                            onPriorityChange={changePriority}
+                            onRemove={removePhoto}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">

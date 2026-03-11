@@ -28,6 +28,7 @@ interface Props {
   onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
   selectedPhotoId?: string | null;
   onSelectPhoto?: (photoId: string) => void;
+  hideNumbers?: boolean;
 }
 
 /** A small stepper badge with − value + buttons. */
@@ -74,6 +75,7 @@ function DraggablePhoto({
   onUpdatePhotoFields,
   isSelected,
   onSelectPhoto,
+  hideNumbers,
 }: {
   photo: PhotoItem;
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number, zoom?: number) => void;
@@ -81,6 +83,7 @@ function DraggablePhoto({
   onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
   isSelected?: boolean;
   onSelectPhoto?: (photoId: string) => void;
+  hideNumbers?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{
@@ -181,22 +184,24 @@ function DraggablePhoto({
       )}
 
       {/* Priority badge — top-left */}
-      <div className="absolute top-1 left-1 z-10">
-        {gridMode && onUpdatePhotoFields ? (
-          <StepBadge
-            value={photo.priority}
-            min={1}
-            max={99}
-            onDecrement={() => step('priority', -1)}
-            onIncrement={() => step('priority', 1)}
-          />
-        ) : (
-          <div className={badgeBase}>{photo.priority}</div>
-        )}
-      </div>
+      {!hideNumbers && (
+        <div className="absolute top-1 left-1 z-10">
+          {gridMode && onUpdatePhotoFields ? (
+            <StepBadge
+              value={photo.priority}
+              min={1}
+              max={99}
+              onDecrement={() => step('priority', -1)}
+              onIncrement={() => step('priority', 1)}
+            />
+          ) : (
+            <div className={badgeBase}>{photo.priority}</div>
+          )}
+        </div>
+      )}
 
       {/* Zoom indicator — top-right in grid mode, bottom-right otherwise */}
-      {zoom !== 1 && (
+      {!hideNumbers && zoom !== 1 && (
         <div
           className={`absolute ${gridMode ? 'top-1 right-1' : 'bottom-1 right-1'} bg-black bg-opacity-60 text-white text-xs rounded px-1 py-0.5 flex items-center gap-0.5 pointer-events-none`}
         >
@@ -209,7 +214,7 @@ function DraggablePhoto({
       )}
 
       {/* Grid-only controls: colSpan (bottom-left) and rowSpan (bottom-right) */}
-      {gridMode && onUpdatePhotoFields && (
+      {!hideNumbers && gridMode && onUpdatePhotoFields && (
         <>
           <div className="absolute bottom-1 left-1 z-10">
             <StepBadge
@@ -243,12 +248,14 @@ function FocalPreview({
   onUpdatePhoto,
   selectedPhotoId,
   onSelectPhoto,
+  hideNumbers,
 }: {
   photos: PhotoItem[];
   fillPage?: boolean;
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
   selectedPhotoId?: string | null;
   onSelectPhoto?: (photoId: string) => void;
+  hideNumbers?: boolean;
 }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const n = sorted.length;
@@ -315,6 +322,7 @@ function FocalPreview({
             onUpdatePhoto={onUpdatePhoto}
             isSelected={selectedPhotoId === photo.id}
             onSelectPhoto={onSelectPhoto}
+            hideNumbers={hideNumbers}
           />
         </div>
       ))}
@@ -329,6 +337,7 @@ function GridPreview({
   onUpdatePhotoFields,
   selectedPhotoId,
   onSelectPhoto,
+  hideNumbers,
 }: {
   photos: PhotoItem[];
   fillPage?: boolean;
@@ -336,6 +345,7 @@ function GridPreview({
   onUpdatePhotoFields?: (photoId: string, fields: Partial<PhotoItem>) => void;
   selectedPhotoId?: string | null;
   onSelectPhoto?: (photoId: string) => void;
+  hideNumbers?: boolean;
 }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const gap = fillPage ? '0' : '2px';
@@ -366,6 +376,7 @@ function GridPreview({
             onUpdatePhotoFields={onUpdatePhotoFields}
             isSelected={selectedPhotoId === photo.id}
             onSelectPhoto={onSelectPhoto}
+            hideNumbers={hideNumbers}
           />
         </div>
       ))}
@@ -380,6 +391,7 @@ function CustomPreview({
   onUpdatePhoto,
   selectedPhotoId,
   onSelectPhoto,
+  hideNumbers,
 }: {
   photos: PhotoItem[];
   zones: TemplateZone[];
@@ -387,6 +399,7 @@ function CustomPreview({
   onUpdatePhoto?: (photoId: string, cropX: number, cropY: number) => void;
   selectedPhotoId?: string | null;
   onSelectPhoto?: (photoId: string) => void;
+  hideNumbers?: boolean;
 }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const rawZones = [...zones].sort((a, b) => a.priority - b.priority);
@@ -417,6 +430,7 @@ function CustomPreview({
                 onUpdatePhoto={onUpdatePhoto}
                 isSelected={selectedPhotoId === photo.id}
                 onSelectPhoto={onSelectPhoto}
+                hideNumbers={hideNumbers}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -435,7 +449,10 @@ function CustomPreview({
   );
 }
 
-export default function PagePreview({ group, customTemplates, onUpdatePhoto, onUpdatePhotoFields, selectedPhotoId, onSelectPhoto }: Props) {
+export default function PagePreview({ group, customTemplates, onUpdatePhoto, onUpdatePhotoFields, selectedPhotoId, onSelectPhoto, hideNumbers: hideNumbersProp }: Props) {
+  const [hideNumbersLocal, setHideNumbersLocal] = useState(false);
+  const hideNumbers = hideNumbersProp ?? hideNumbersLocal;
+
   if (group.photos.length === 0) {
     return (
       <div
@@ -459,6 +476,7 @@ export default function PagePreview({ group, customTemplates, onUpdatePhoto, onU
         onUpdatePhotoFields={onUpdatePhotoFields}
         selectedPhotoId={selectedPhotoId}
         onSelectPhoto={onSelectPhoto}
+        hideNumbers={hideNumbers}
       />
     );
     if (group.template === 'focal') return (
@@ -468,6 +486,7 @@ export default function PagePreview({ group, customTemplates, onUpdatePhoto, onU
         onUpdatePhoto={onUpdatePhoto}
         selectedPhotoId={selectedPhotoId}
         onSelectPhoto={onSelectPhoto}
+        hideNumbers={hideNumbers}
       />
     );
     // Custom template
@@ -483,6 +502,7 @@ export default function PagePreview({ group, customTemplates, onUpdatePhoto, onU
         onUpdatePhoto={onUpdatePhoto}
         selectedPhotoId={selectedPhotoId}
         onSelectPhoto={onSelectPhoto}
+        hideNumbers={hideNumbers}
       />
     );
     return (
@@ -492,13 +512,14 @@ export default function PagePreview({ group, customTemplates, onUpdatePhoto, onU
         onUpdatePhoto={onUpdatePhoto}
         selectedPhotoId={selectedPhotoId}
         onSelectPhoto={onSelectPhoto}
+        hideNumbers={hideNumbers}
       />
     );
   };
 
   return (
     <div
-      className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm"
+      className="w-full bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm relative"
       style={{ aspectRatio: '11/8.5' }}
     >
       {group.name && (
@@ -509,6 +530,20 @@ export default function PagePreview({ group, customTemplates, onUpdatePhoto, onU
       <div className={paddingClass} style={{ height: group.name ? 'calc(100% - 28px)' : '100%' }}>
         {renderLayout()}
       </div>
+      {/* Clean preview toggle */}
+      {hideNumbersProp === undefined && (
+        <button
+          onClick={() => setHideNumbersLocal((v) => !v)}
+          title={hideNumbersLocal ? 'Show numbers' : 'Hide numbers for clean preview'}
+          className={`absolute top-1.5 right-1.5 z-20 rounded px-1.5 py-0.5 text-xs font-medium transition-all shadow-sm ${
+            hideNumbersLocal
+              ? 'bg-blue-600 text-white'
+              : 'bg-black bg-opacity-40 text-white hover:bg-opacity-60'
+          }`}
+        >
+          {hideNumbersLocal ? '# on' : '# off'}
+        </button>
+      )}
     </div>
   );
 }
