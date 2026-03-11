@@ -17,14 +17,14 @@ interface Props {
 }
 
 const RESIZE_HANDLES: { handle: ResizeHandle; cursor: string; style: React.CSSProperties }[] = [
-  { handle: 'nw', cursor: 'nw-resize', style: { top: -5, left: -5 } },
-  { handle: 'n',  cursor: 'n-resize',  style: { top: -5, left: '50%', transform: 'translateX(-50%)' } },
-  { handle: 'ne', cursor: 'ne-resize', style: { top: -5, right: -5 } },
-  { handle: 'e',  cursor: 'e-resize',  style: { top: '50%', right: -5, transform: 'translateY(-50%)' } },
-  { handle: 'se', cursor: 'se-resize', style: { bottom: -5, right: -5 } },
-  { handle: 's',  cursor: 's-resize',  style: { bottom: -5, left: '50%', transform: 'translateX(-50%)' } },
-  { handle: 'sw', cursor: 'sw-resize', style: { bottom: -5, left: -5 } },
-  { handle: 'w',  cursor: 'w-resize',  style: { top: '50%', left: -5, transform: 'translateY(-50%)' } },
+  { handle: 'nw', cursor: 'nw-resize', style: { top: -6, left: -6 } },
+  { handle: 'n',  cursor: 'n-resize',  style: { top: -6, left: '50%', transform: 'translateX(-50%)' } },
+  { handle: 'ne', cursor: 'ne-resize', style: { top: -6, right: -6 } },
+  { handle: 'e',  cursor: 'e-resize',  style: { top: '50%', right: -6, transform: 'translateY(-50%)' } },
+  { handle: 'se', cursor: 'se-resize', style: { bottom: -6, right: -6 } },
+  { handle: 's',  cursor: 's-resize',  style: { bottom: -6, left: '50%', transform: 'translateX(-50%)' } },
+  { handle: 'sw', cursor: 'sw-resize', style: { bottom: -6, left: -6 } },
+  { handle: 'w',  cursor: 'w-resize',  style: { top: '50%', left: -6, transform: 'translateY(-50%)' } },
 ];
 
 export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Props) {
@@ -33,23 +33,26 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
   const [templateName, setTemplateName] = useState(initialTemplate?.name ?? 'My Template');
   const [interaction, setInteraction] = useState<Interaction | null>(null);
   const [currentDraw, setCurrentDraw] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [showControls, setShowControls] = useState(true);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  const getPercent = (e: React.MouseEvent): { x: number; y: number } => {
+  const getPercent = (clientX: number, clientY: number): { x: number; y: number } => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
     return {
-      x: Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100)),
+      x: Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100)),
+      y: Math.max(0, Math.min(100, ((clientY - rect.top) / rect.height) * 100)),
     };
   };
 
   const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+  // --- Mouse handlers ---
+
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     if (e.target !== canvasRef.current) return;
     e.preventDefault();
-    const { x, y } = getPercent(e);
+    const { x, y } = getPercent(e.clientX, e.clientY);
     setSelectedId(null);
     setInteraction({ type: 'draw', startX: x, startY: y });
   };
@@ -57,7 +60,7 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
   const handleZoneMouseDown = (e: React.MouseEvent, zoneId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const { x, y } = getPercent(e);
+    const { x, y } = getPercent(e.clientX, e.clientY);
     const zone = zones.find((z) => z.id === zoneId);
     if (!zone) return;
     setSelectedId(zoneId);
@@ -67,43 +70,41 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
   const handleResizeMouseDown = (e: React.MouseEvent, zoneId: string, handle: ResizeHandle) => {
     e.preventDefault();
     e.stopPropagation();
-    const { x, y } = getPercent(e);
+    const { x, y } = getPercent(e.clientX, e.clientY);
     const zone = zones.find((z) => z.id === zoneId);
     if (!zone) return;
     setInteraction({ type: 'resize', zoneId, handle, startX: x, startY: y, origZone: { ...zone } });
   };
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!interaction) return;
-    e.preventDefault();
-    const { x, y } = getPercent(e);
+  // --- Shared interaction logic ---
 
-    if (interaction.type === 'draw') {
-      const rx = Math.min(x, interaction.startX);
-      const ry = Math.min(y, interaction.startY);
-      const rw = Math.abs(x - interaction.startX);
-      const rh = Math.abs(y - interaction.startY);
+  const applyInteraction = useCallback((x: number, y: number, currentInteraction: Interaction) => {
+    if (currentInteraction.type === 'draw') {
+      const rx = Math.min(x, currentInteraction.startX);
+      const ry = Math.min(y, currentInteraction.startY);
+      const rw = Math.abs(x - currentInteraction.startX);
+      const rh = Math.abs(y - currentInteraction.startY);
       setCurrentDraw({ x: rx, y: ry, w: rw, h: rh });
-    } else if (interaction.type === 'move') {
-      const dx = x - interaction.startX;
-      const dy = y - interaction.startY;
+    } else if (currentInteraction.type === 'move') {
+      const dx = x - currentInteraction.startX;
+      const dy = y - currentInteraction.startY;
       setZones((prev) =>
         prev.map((z) => {
-          if (z.id !== interaction.zoneId) return z;
+          if (z.id !== currentInteraction.zoneId) return z;
           return {
             ...z,
-            x: clamp(interaction.origX + dx, 0, 100 - z.width),
-            y: clamp(interaction.origY + dy, 0, 100 - z.height),
+            x: clamp(currentInteraction.origX + dx, 0, 100 - z.width),
+            y: clamp(currentInteraction.origY + dy, 0, 100 - z.height),
           };
         })
       );
-    } else if (interaction.type === 'resize') {
-      const { handle, origZone } = interaction;
-      const dx = x - interaction.startX;
-      const dy = y - interaction.startY;
+    } else if (currentInteraction.type === 'resize') {
+      const { handle, origZone } = currentInteraction;
+      const dx = x - currentInteraction.startX;
+      const dy = y - currentInteraction.startY;
       setZones((prev) =>
         prev.map((z) => {
-          if (z.id !== interaction.zoneId) return z;
+          if (z.id !== currentInteraction.zoneId) return z;
           let { x: zx, y: zy, width: zw, height: zh } = origZone;
           if (handle.includes('e')) zw = clamp(origZone.width + dx, 5, 100 - origZone.x);
           if (handle.includes('s')) zh = clamp(origZone.height + dy, 5, 100 - origZone.y);
@@ -121,18 +122,25 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
         })
       );
     }
-  }, [interaction]);
+  }, []);
 
-  const handleMouseUp = useCallback(() => {
-    if (interaction?.type === 'draw' && currentDraw) {
-      if (currentDraw.w > 3 && currentDraw.h > 3) {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!interaction) return;
+    e.preventDefault();
+    const { x, y } = getPercent(e.clientX, e.clientY);
+    applyInteraction(x, y, interaction);
+  }, [interaction, applyInteraction]);
+
+  const finalizeInteraction = useCallback((currentInteraction: Interaction | null, draw: typeof currentDraw) => {
+    if (currentInteraction?.type === 'draw' && draw) {
+      if (draw.w > 3 && draw.h > 3) {
         const nextPriority = zones.length + 1;
         const newZone: TemplateZone = {
           id: uuidv4(),
-          x: currentDraw.x,
-          y: currentDraw.y,
-          width: currentDraw.w,
-          height: currentDraw.h,
+          x: draw.x,
+          y: draw.y,
+          width: draw.w,
+          height: draw.h,
           priority: nextPriority,
         };
         setZones((prev) => [...prev, newZone]);
@@ -141,7 +149,57 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
       setCurrentDraw(null);
     }
     setInteraction(null);
-  }, [interaction, currentDraw, zones]);
+  }, [zones.length]);
+
+  const handleMouseUp = useCallback(() => {
+    finalizeInteraction(interaction, currentDraw);
+  }, [interaction, currentDraw, finalizeInteraction]);
+
+  // --- Touch handlers ---
+
+  const handleCanvasTouchStart = (e: React.TouchEvent) => {
+    if (e.target !== canvasRef.current) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const { x, y } = getPercent(touch.clientX, touch.clientY);
+    setSelectedId(null);
+    setInteraction({ type: 'draw', startX: x, startY: y });
+  };
+
+  const handleZoneTouchStart = (e: React.TouchEvent, zoneId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const touch = e.touches[0];
+    const { x, y } = getPercent(touch.clientX, touch.clientY);
+    const zone = zones.find((z) => z.id === zoneId);
+    if (!zone) return;
+    setSelectedId(zoneId);
+    setInteraction({ type: 'move', zoneId, startX: x, startY: y, origX: zone.x, origY: zone.y });
+  };
+
+  const handleResizeTouchStart = (e: React.TouchEvent, zoneId: string, handle: ResizeHandle) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const touch = e.touches[0];
+    const { x, y } = getPercent(touch.clientX, touch.clientY);
+    const zone = zones.find((z) => z.id === zoneId);
+    if (!zone) return;
+    setInteraction({ type: 'resize', zoneId, handle, startX: x, startY: y, origZone: { ...zone } });
+  };
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!interaction) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const { x, y } = getPercent(touch.clientX, touch.clientY);
+    applyInteraction(x, y, interaction);
+  }, [interaction, applyInteraction]);
+
+  const handleTouchEnd = useCallback(() => {
+    finalizeInteraction(interaction, currentDraw);
+  }, [interaction, currentDraw, finalizeInteraction]);
+
+  // --- Zone management ---
 
   const deleteZone = (id: string) => {
     setZones((prev) => prev.filter((z) => z.id !== id));
@@ -172,41 +230,58 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
   const sortedZones = [...zones].sort((a, b) => a.priority - b.priority);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black bg-opacity-60">
       <div
-        className="bg-white rounded-xl shadow-2xl flex flex-col"
-        style={{ width: '92vw', maxWidth: 1100, height: '92vh' }}
+        className="bg-white flex flex-col w-full rounded-t-2xl sm:rounded-xl shadow-2xl"
+        style={{ height: '95vh', maxWidth: 1100 }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
-          <div>
-            <h2 className="text-lg font-bold text-gray-800">{initialTemplate ? 'Edit Template' : 'Template Builder'}</h2>
-            <p className="text-xs text-gray-400 mt-0.5">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex-shrink-0">
+          <div className="min-w-0 flex-1 mr-4">
+            <h2 className="text-base sm:text-lg font-bold text-gray-800 truncate">
+              {initialTemplate ? 'Edit Template' : 'Template Builder'}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">
               Click and drag on the page to draw photo zones. Drag to move, drag handles to resize.
             </p>
+            <p className="text-xs text-gray-400 mt-0.5 sm:hidden">
+              Tap and drag to draw zones
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl font-light">
-            ×
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Mobile controls toggle */}
+            <button
+              onClick={() => setShowControls((v) => !v)}
+              className="sm:hidden text-xs font-medium text-blue-600 border border-blue-200 rounded-lg px-2.5 py-1.5"
+            >
+              {showControls ? 'Hide controls' : 'Show controls'}
+            </button>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl font-light leading-none">
+              ×
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        {/* Body */}
+        <div className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
           {/* Canvas area */}
-          <div className="flex-1 bg-gray-100 flex items-center justify-center p-6 overflow-hidden">
-            {/* 8.5x11 landscape canvas */}
+          <div className="flex-1 bg-gray-100 flex items-center justify-center p-3 sm:p-6 overflow-auto sm:overflow-hidden min-h-0">
             <div
               ref={canvasRef}
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
-              className="bg-white shadow-xl relative select-none flex-shrink-0"
+              onTouchStart={handleCanvasTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              className="bg-white shadow-xl relative select-none w-full sm:w-auto sm:h-full flex-shrink-0"
               style={{
                 aspectRatio: '11 / 8.5',
-                height: '100%',
-                maxHeight: '100%',
                 cursor: 'crosshair',
                 userSelect: 'none',
+                touchAction: 'none',
+                maxHeight: '100%',
               }}
             >
               {/* Grid overlay */}
@@ -226,6 +301,7 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
                   <div
                     key={zone.id}
                     onMouseDown={(e) => handleZoneMouseDown(e, zone.id)}
+                    onTouchStart={(e) => handleZoneTouchStart(e, zone.id)}
                     style={{
                       position: 'absolute',
                       left: `${zone.x}%`,
@@ -237,6 +313,7 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
                       borderRadius: 3,
                       cursor: 'move',
                       boxSizing: 'border-box',
+                      touchAction: 'none',
                     }}
                   >
                     {/* Priority label */}
@@ -252,14 +329,16 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
                         <div
                           key={handle}
                           onMouseDown={(e) => handleResizeMouseDown(e, zone.id, handle)}
+                          onTouchStart={(e) => handleResizeTouchStart(e, zone.id, handle)}
                           style={{
                             position: 'absolute',
-                            width: 10,
-                            height: 10,
+                            width: 12,
+                            height: 12,
                             background: '#2563eb',
                             border: '2px solid white',
                             borderRadius: 2,
                             cursor,
+                            touchAction: 'none',
                             ...hStyle,
                           }}
                         />
@@ -287,8 +366,13 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
             </div>
           </div>
 
-          {/* Side panel */}
-          <div className="w-64 border-l border-gray-200 flex flex-col p-4 gap-4 overflow-y-auto flex-shrink-0">
+          {/* Side / bottom panel */}
+          <div
+            className={`${
+              showControls ? 'flex' : 'hidden sm:flex'
+            } sm:flex w-full sm:w-64 border-t sm:border-t-0 sm:border-l border-gray-200 flex-col p-4 gap-4 overflow-y-auto flex-shrink-0`}
+            style={{ maxHeight: '45vh', minHeight: 0 }}
+          >
             {/* Template name */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
@@ -303,7 +387,7 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
             </div>
 
             {/* Zone list */}
-            <div className="flex-1">
+            <div className="flex-1 min-h-0">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Zones ({zones.length})
@@ -394,8 +478,8 @@ export default function TemplateBuilder({ onSave, onClose, initialTemplate }: Pr
               </div>
             )}
 
-            {/* Instructions */}
-            <div className="text-xs text-gray-400 space-y-1 border-t border-gray-100 pt-3">
+            {/* Instructions — hidden on very small screens to save space */}
+            <div className="text-xs text-gray-400 space-y-1 border-t border-gray-100 pt-3 hidden sm:block">
               <p>• Drag on canvas to draw a zone</p>
               <p>• Drag a zone to move it</p>
               <p>• Drag handles to resize</p>

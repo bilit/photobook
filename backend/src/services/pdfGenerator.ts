@@ -80,9 +80,14 @@ function renderFocalTemplate(group: PhotoGroup, baseCSS: string): string {
   const template = loadTemplate('focal');
   const slots = buildPhotoSlots(sorted);
   const hasTitle = group.name && group.name.trim() !== '';
+  const fillCSS = group.fillPage
+    ? `.page { padding: 0; gap: 0; }
+.layout { gap: 0; }
+.photo-slot { border-radius: 0; }`
+    : '';
 
   return template
-    .replace('{{BASE_CSS}}', baseCSS)
+    .replace('{{BASE_CSS}}', baseCSS + '\n' + fillCSS)
     .replace('{{COUNT}}', String(n))
     .replace('{{PHOTOS}}', slots)
     .replace(
@@ -98,9 +103,14 @@ function renderGridTemplate(group: PhotoGroup, baseCSS: string): string {
   const template = loadTemplate('grid');
   const slots = buildPhotoSlots(sorted);
   const hasTitle = group.name && group.name.trim() !== '';
+  const fillCSS = group.fillPage
+    ? `.page { padding: 0; gap: 0; }
+.layout { gap: 0; }
+.photo-slot { border-radius: 0; }`
+    : '';
 
   return template
-    .replace('{{BASE_CSS}}', baseCSS)
+    .replace('{{BASE_CSS}}', baseCSS + '\n' + fillCSS)
     .replace('{{COLS}}', String(cols))
     .replace('{{PHOTOS}}', slots)
     .replace(
