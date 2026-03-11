@@ -1,4 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+const BOOK_KEY = 'photobook_data';
+const GROUP_KEY = 'photobook_selected_group';
+const LEFT_KEY = 'photobook_left_open';
+const RIGHT_KEY = 'photobook_right_open';
+
+function loadBook(): import('../types').PhotoBook {
+  try {
+    const raw = localStorage.getItem(BOOK_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return { id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2), title: 'My Photobook', groups: [], importedPhotos: [] };
+}
 import {
   DndContext,
   closestCenter,
@@ -70,20 +83,37 @@ function SortablePageItem({
 }
 
 export default function EditorPage({ user }: Props) {
-  const [book, setBook] = useState<PhotoBook>({
-    id: uuidv4(),
-    title: 'My Photobook',
-    groups: [],
-    importedPhotos: [],
-  });
+  const [book, setBook] = useState<PhotoBook>(loadBook);
   const [showImporter, setShowImporter] = useState(false);
   const [importTab, setImportTab] = useState<'google' | 'upload'>('google');
   const [generating, setGenerating] = useState(false);
   const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>(() => loadTemplates());
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(
+    () => localStorage.getItem(GROUP_KEY)
+  );
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(() => localStorage.getItem(LEFT_KEY) !== 'false');
+  const [rightOpen, setRightOpen] = useState(() => localStorage.getItem(RIGHT_KEY) !== 'false');
+
+  // Persist book — debounced to avoid hammering storage on every keystroke/drag
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      try { localStorage.setItem(BOOK_KEY, JSON.stringify(book)); } catch {}
+    }, 500);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [book]);
+
+  // Persist sidebar state and selected group
+  useEffect(() => { try { localStorage.setItem(LEFT_KEY, String(leftOpen)); } catch {} }, [leftOpen]);
+  useEffect(() => { try { localStorage.setItem(RIGHT_KEY, String(rightOpen)); } catch {} }, [rightOpen]);
+  useEffect(() => {
+    try {
+      if (selectedGroupId) localStorage.setItem(GROUP_KEY, selectedGroupId);
+      else localStorage.removeItem(GROUP_KEY);
+    } catch {}
+  }, [selectedGroupId]);
 
   // Auto-select first page when groups change
   useEffect(() => {
