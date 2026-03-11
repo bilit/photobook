@@ -1,4 +1,4 @@
-import puppeteer, { Browser } from 'puppeteer';
+import puppeteer, { Browser } from 'puppeteer-core';
 import { PDFDocument } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
