@@ -25,7 +25,7 @@ interface Props {
   customTemplates: CustomTemplate[];
 }
 
-function FocalPreview({ photos }: { photos: PhotoItem[] }) {
+function FocalPreview({ photos, fillPage }: { photos: PhotoItem[]; fillPage?: boolean }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const n = sorted.length;
 
@@ -76,15 +76,17 @@ function FocalPreview({ photos }: { photos: PhotoItem[] }) {
     return {};
   };
 
+  const gap = fillPage ? '0' : '2px';
+
   return (
-    <div className="w-full h-full grid gap-0.5" style={getGridStyle()}>
+    <div className="w-full h-full grid" style={{ ...getGridStyle(), gap }}>
       {sorted.map((photo, i) => (
         <div
           key={photo.id}
-          className="overflow-hidden rounded bg-gray-200 relative"
+          className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}
           style={getPhotoStyle(i)}
         >
-          <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-cover" />
+          <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-contain" />
           <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
             {photo.priority}
           </div>
@@ -94,19 +96,20 @@ function FocalPreview({ photos }: { photos: PhotoItem[] }) {
   );
 }
 
-function GridPreview({ photos }: { photos: PhotoItem[] }) {
+function GridPreview({ photos, fillPage }: { photos: PhotoItem[]; fillPage?: boolean }) {
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const n = sorted.length;
   const cols = Math.ceil(Math.sqrt(n));
+  const gap = fillPage ? '0' : '2px';
 
   return (
     <div
-      className="w-full h-full grid gap-0.5"
-      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: '1fr' }}
+      className="w-full h-full grid"
+      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: '1fr', gap }}
     >
       {sorted.map((photo) => (
-        <div key={photo.id} className="overflow-hidden rounded bg-gray-200 relative">
-          <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-cover" />
+        <div key={photo.id} className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}>
+          <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-contain" />
           <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
             {photo.priority}
           </div>
@@ -142,7 +145,7 @@ function CustomPreview({ photos, zones, fillPage }: { photos: PhotoItem[]; zones
           >
             {photo ? (
               <>
-                <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-cover" />
+                <img src={photo.thumbnailUrl} alt={photo.filename} className="w-full h-full object-contain" />
                 <div className="absolute top-1 left-1 bg-white bg-opacity-80 text-xs font-bold text-gray-700 rounded px-1">
                   {photo.priority}
                 </div>
@@ -176,16 +179,21 @@ export default function PagePreview({ group, customTemplates }: Props) {
     );
   }
 
+  const isBuiltIn = group.template === 'focal' || group.template === 'grid';
+  const fillPage = group.fillPage;
+  // For built-in templates with fillPage, remove padding for edge-to-edge bleed
+  const paddingClass = isBuiltIn && fillPage ? 'p-0' : 'p-1';
+
   const renderLayout = () => {
-    if (group.template === 'grid') return <GridPreview photos={group.photos} />;
-    if (group.template === 'focal') return <FocalPreview photos={group.photos} />;
+    if (group.template === 'grid') return <GridPreview photos={group.photos} fillPage={fillPage} />;
+    if (group.template === 'focal') return <FocalPreview photos={group.photos} fillPage={fillPage} />;
     // Custom template
     const zones =
       group.templateZones ??
       customTemplates.find((t) => t.id === group.template)?.zones ??
       [];
-    if (zones.length > 0) return <CustomPreview photos={group.photos} zones={zones} fillPage={group.fillPage} />;
-    return <FocalPreview photos={group.photos} />;
+    if (zones.length > 0) return <CustomPreview photos={group.photos} zones={zones} fillPage={fillPage} />;
+    return <FocalPreview photos={group.photos} fillPage={fillPage} />;
   };
 
   return (
@@ -198,7 +206,7 @@ export default function PagePreview({ group, customTemplates }: Props) {
           {group.name}
         </div>
       )}
-      <div className="p-1" style={{ height: group.name ? 'calc(100% - 28px)' : '100%' }}>
+      <div className={paddingClass} style={{ height: group.name ? 'calc(100% - 28px)' : '100%' }}>
         {renderLayout()}
       </div>
     </div>
