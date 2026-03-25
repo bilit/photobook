@@ -2,7 +2,7 @@ services:
   - type: web
     name: photobook
     runtime: node
-    buildCommand: npm run install:all && npm run build
+    buildCommand: apt-get update && apt-get install -y chromium && npm run install:all && npm run build
     startCommand: node backend/dist/index.js
     envVars:
       - key: NODE_ENV
@@ -15,5 +15,9 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/chromium
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"
       - key: BACKEND_URL
         sync: false
