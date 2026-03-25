@@ -240,7 +240,7 @@ export default function PagesByDateModal({ importedPhotos, onApply, onClose }: P
             group.pagesCount > 1
               ? `${dateLabel} (${pageIdx + 1}/${group.pagesCount})`
               : dateLabel,
-          template: 'focal',
+          template: 'grid',
           photos: pagePhotos.map((p, idx) => ({ ...p, priority: idx + 1 })),
         });
       });
