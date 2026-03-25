@@ -102,7 +102,7 @@ function DraggablePhoto({
   const step = (field: 'priority' | 'colSpan' | 'rowSpan', delta: number) => {
     if (!onUpdatePhotoFields) return;
     const current = field === 'priority' ? photo.priority : field === 'colSpan' ? colSpan : rowSpan;
-    const max = field === 'priority' ? 99 : field === 'colSpan' ? 3 : 4;
+    const max = field === 'priority' ? 99 : 5;
     const next = Math.max(1, Math.min(max, current + delta));
     onUpdatePhotoFields(photo.id, { [field]: next });
   };
@@ -354,8 +354,8 @@ function GridPreview({
     <div
       className="w-full h-full grid"
       style={{
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gridTemplateRows: 'repeat(4, 1fr)',
+        gridTemplateColumns: 'repeat(5, 1fr)',
+        gridTemplateRows: 'repeat(5, 1fr)',
         gridAutoFlow: 'dense',
         gap,
       }}
@@ -365,8 +365,8 @@ function GridPreview({
           key={photo.id}
           className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}
           style={{
-            gridColumn: `span ${Math.min(photo.colSpan ?? 1, 3)}`,
-            gridRow: `span ${Math.min(photo.rowSpan ?? 1, 4)}`,
+            gridColumn: `span ${Math.min(photo.colSpan ?? 1, 5)}`,
+            gridRow: `span ${Math.min(photo.rowSpan ?? 1, 5)}`,
           }}
         >
           <DraggablePhoto

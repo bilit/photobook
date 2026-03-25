@@ -168,7 +168,7 @@ export default function EditorPage({ user }: Props) {
     const newGroup: PhotoGroup = {
       id: uuidv4(),
       name: `Page ${book.groups.length + 1}`,
-      template: 'focal',
+      template: 'grid',
       photos: [],
     };
     setBook((b) => ({ ...b, groups: [...b.groups, newGroup] }));
