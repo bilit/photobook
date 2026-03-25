@@ -59,6 +59,17 @@ export async function deletePickerSession(sessionId: string): Promise<void> {
   await api.delete(`/api/picker/sessions/${sessionId}`);
 }
 
+/**
+ * Download Google Photos images to the server so they survive URL expiry.
+ * Returns a map of original photo ID → { url, thumbnailUrl } for cached photos.
+ */
+export async function cachePickerPhotos(
+  photos: { id: string; baseUrl: string }[]
+): Promise<Record<string, { url: string; thumbnailUrl: string }>> {
+  const { data } = await api.post('/api/picker/cache', { photos });
+  return data.cached || {};
+}
+
 export async function uploadFiles(files: File[]): Promise<PhotoItem[]> {
   const formData = new FormData();
   for (const file of files) {

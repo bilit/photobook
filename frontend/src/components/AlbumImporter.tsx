@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPickerSession, getPickerSession, getPickerItems, deletePickerSession } from '../api/client';
+import { createPickerSession, getPickerSession, getPickerItems, deletePickerSession, cachePickerPhotos } from '../api/client';
 import type { PhotoItem } from '../types';
 
 interface Props {
@@ -98,9 +98,31 @@ export default function AlbumImporter({ onAddToLibrary, onDone }: Props) {
     });
   };
 
-  const addSelected = () => {
+  const addSelected = async () => {
     const chosen = photos.filter((p) => selected.has(p.id));
     if (chosen.length === 0) return;
+
+    setState('loading');
+
+    // Cache photos on the server so they survive Google URL expiry
+    try {
+      const toCache = chosen.map((p) => ({ id: p.id, baseUrl: p.url }));
+      const cached = await cachePickerPhotos(toCache);
+
+      // Update photo URLs with local cached versions
+      for (const photo of chosen) {
+        const local = cached[photo.id];
+        if (local) {
+          photo.url = local.url;
+          photo.thumbnailUrl = local.thumbnailUrl;
+          photo.id = `local-${photo.id}`;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to cache photos, using original URLs:', err);
+      // Fall through — photos will still work until URLs expire
+    }
+
     // Clean up the session in the background
     if (sessionId) deletePickerSession(sessionId).catch(() => {});
     onAddToLibrary(chosen);

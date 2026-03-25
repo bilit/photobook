@@ -1,4 +1,4 @@
-import puppeteer, { Browser } from 'puppeteer-core';
+import puppeteer, { Browser } from 'puppeteer';
 import { PDFDocument } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
@@ -234,6 +234,7 @@ export async function generatePhotobook(book: PhotoBook): Promise<Buffer> {
       '--allow-file-access-from-files',
     ],
   };
+  // Allow overriding the bundled Chrome path via env var
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   }
