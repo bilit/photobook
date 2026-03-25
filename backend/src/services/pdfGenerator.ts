@@ -70,7 +70,11 @@ function loadBaseCSS(): string {
 function buildPhotoSlots(photos: PhotoItem[]): string {
   return photos
     .map((photo, i) => {
-      const imgUrl = photo.id.startsWith('local-') ? photo.url : `${photo.url}=w2000-h2000`;
+      const imgUrl = photo.id.startsWith('local-')
+        ? photo.url
+        : photo.id.startsWith('cached-')
+          ? `file://${photo.url}`
+          : `${photo.url}=w2000-h2000`;
       const cropX = photo.cropX ?? 50;
       const cropY = photo.cropY ?? 50;
       return `<div class="photo-slot photo-${i}"><img src="${imgUrl}" alt="${photo.filename}" style="object-position:${cropX}% ${cropY}%" /></div>`;
@@ -152,7 +156,11 @@ function renderCustomTemplate(group: PhotoGroup, baseCSS: string): string {
     .map((_, i) => {
       const photo = sorted[i];
       if (!photo) return `<div class="zone-${i}"></div>`;
-      const imgUrl = photo.id.startsWith('local-') ? photo.url : `${photo.url}=w2000-h2000`;
+      const imgUrl = photo.id.startsWith('local-')
+        ? photo.url
+        : photo.id.startsWith('cached-')
+          ? `file://${photo.url}`
+          : `${photo.url}=w2000-h2000`;
       const cropX = photo.cropX ?? 50;
       const cropY = photo.cropY ?? 50;
       return `<div class="zone-${i}"><img src="${imgUrl}" alt="${photo.filename}" style="width:100%;height:100%;object-fit:cover;object-position:${cropX}% ${cropY}%;" /></div>`;
@@ -223,6 +231,7 @@ export async function generatePhotobook(book: PhotoBook): Promise<Buffer> {
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
+      '--allow-file-access-from-files',
     ],
   };
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {

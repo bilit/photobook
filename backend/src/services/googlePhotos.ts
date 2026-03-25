@@ -69,28 +69,3 @@ export async function deletePickerSession(accessToken: string, sessionId: string
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
 }
-
-export async function refreshMediaItemUrls(
-  accessToken: string,
-  mediaItemIds: string[]
-): Promise<Map<string, string>> {
-  const urlMap = new Map<string, string>();
-
-  await Promise.all(
-    mediaItemIds.map(async (id) => {
-      try {
-        const response = await axios.get(`${PICKER_API}/mediaItems/${id}`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        const item: PickerMediaItem = response.data;
-        if (item.mediaFile?.baseUrl) {
-          urlMap.set(id, item.mediaFile.baseUrl);
-        }
-      } catch (err) {
-        console.error(`Failed to refresh URL for media item ${id}:`, err);
-      }
-    })
-  );
-
-  return urlMap;
-}
