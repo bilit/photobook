@@ -221,17 +221,17 @@ function DraggablePhoto({
               label="↔"
               value={colSpan}
               min={1}
-              max={3}
+              max={5}
               onDecrement={() => step('colSpan', -1)}
               onIncrement={() => step('colSpan', 1)}
             />
           </div>
-          <div className="absolute bottom-1 right-1 z-10">
+          <div className="absolute bottom-1 right-7 z-10">
             <StepBadge
               label="↕"
               value={rowSpan}
               min={1}
-              max={4}
+              max={5}
               onDecrement={() => step('rowSpan', -1)}
               onIncrement={() => step('rowSpan', 1)}
             />
@@ -330,6 +330,31 @@ function FocalPreview({
   );
 }
 
+const GRID_COLS = 5;
+const GRID_ROWS = 5;
+
+type ActiveDrag =
+  | { type: 'move'; photoId: string; colSpan: number; rowSpan: number }
+  | {
+      type: 'resize';
+      photoId: string;
+      handle: 'col' | 'row' | 'both';
+      startColSpan: number;
+      startRowSpan: number;
+      startX: number;
+      startY: number;
+      curColSpan: number;
+      curRowSpan: number;
+    };
+
+type DragPreview = {
+  photoId: string;
+  col?: number;
+  row?: number;
+  colSpan?: number;
+  rowSpan?: number;
+};
+
 function GridPreview({
   photos,
   fillPage,
@@ -347,39 +372,237 @@ function GridPreview({
   onSelectPhoto?: (photoId: string) => void;
   hideNumbers?: boolean;
 }) {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<ActiveDrag | null>(null);
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
+
+  const cellAt = (clientX: number, clientY: number) => {
+    const rect = gridRef.current?.getBoundingClientRect();
+    if (!rect) return { col: 1, row: 1 };
+    return {
+      col: Math.max(1, Math.min(GRID_COLS, Math.ceil(((clientX - rect.left) / rect.width) * GRID_COLS))),
+      row: Math.max(1, Math.min(GRID_ROWS, Math.ceil(((clientY - rect.top) / rect.height) * GRID_ROWS))),
+    };
+  };
+
+  // ── Move drag ──────────────────────────────────────────────────────────────
+
+  const onGripDown = (e: React.MouseEvent, photo: PhotoItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const colSpan = Math.min(photo.colSpan ?? 1, GRID_COLS);
+    const rowSpan = Math.min(photo.rowSpan ?? 1, GRID_ROWS);
+    dragRef.current = { type: 'move', photoId: photo.id, colSpan, rowSpan };
+    document.body.style.cursor = 'grabbing';
+
+    const clamp = (col: number, row: number) => ({
+      col: Math.max(1, Math.min(GRID_COLS - colSpan + 1, col)),
+      row: Math.max(1, Math.min(GRID_ROWS - rowSpan + 1, row)),
+    });
+
+    const onMove = (ev: MouseEvent) => {
+      const { col: c, row: r } = cellAt(ev.clientX, ev.clientY);
+      const { col, row } = clamp(c, r);
+      setDragPreview({ photoId: photo.id, col, row, colSpan, rowSpan });
+    };
+
+    const onUp = (ev: MouseEvent) => {
+      const { col: c, row: r } = cellAt(ev.clientX, ev.clientY);
+      const { col, row } = clamp(c, r);
+      onUpdatePhotoFields?.(photo.id, { gridColStart: col, gridRowStart: row });
+      dragRef.current = null;
+      setDragPreview(null);
+      document.body.style.cursor = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  // ── Resize drag ────────────────────────────────────────────────────────────
+
+  const onEdgeDown = (e: React.MouseEvent, photo: PhotoItem, handle: 'col' | 'row' | 'both') => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = gridRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cw = rect.width / GRID_COLS;
+    const ch = rect.height / GRID_ROWS;
+    const startColSpan = Math.min(photo.colSpan ?? 1, GRID_COLS);
+    const startRowSpan = Math.min(photo.rowSpan ?? 1, GRID_ROWS);
+    dragRef.current = {
+      type: 'resize', photoId: photo.id, handle,
+      startColSpan, startRowSpan,
+      startX: e.clientX, startY: e.clientY,
+      curColSpan: startColSpan, curRowSpan: startRowSpan,
+    };
+    document.body.style.cursor =
+      handle === 'col' ? 'col-resize' : handle === 'row' ? 'row-resize' : 'nwse-resize';
+
+    const onMove = (ev: MouseEvent) => {
+      const drag = dragRef.current;
+      if (!drag || drag.type !== 'resize') return;
+      const dx = ev.clientX - drag.startX;
+      const dy = ev.clientY - drag.startY;
+      const p: DragPreview = { photoId: drag.photoId };
+      if (handle === 'col' || handle === 'both') {
+        drag.curColSpan = Math.max(1, Math.min(GRID_COLS, Math.round(drag.startColSpan + dx / cw)));
+        p.colSpan = drag.curColSpan;
+      }
+      if (handle === 'row' || handle === 'both') {
+        drag.curRowSpan = Math.max(1, Math.min(GRID_ROWS, Math.round(drag.startRowSpan + dy / ch)));
+        p.rowSpan = drag.curRowSpan;
+      }
+      setDragPreview(p);
+    };
+
+    const onUp = () => {
+      const drag = dragRef.current;
+      if (drag?.type === 'resize') {
+        const updates: Partial<PhotoItem> = {};
+        if (handle === 'col' || handle === 'both') updates.colSpan = drag.curColSpan;
+        if (handle === 'row' || handle === 'both') updates.rowSpan = drag.curRowSpan;
+        onUpdatePhotoFields?.(drag.photoId, updates);
+      }
+      dragRef.current = null;
+      setDragPreview(null);
+      document.body.style.cursor = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   const sorted = [...photos].sort((a, b) => a.priority - b.priority);
   const gap = fillPage ? '0' : '2px';
 
   return (
     <div
-      className="w-full h-full grid"
+      ref={gridRef}
+      className="w-full h-full grid relative"
       style={{
-        gridTemplateColumns: 'repeat(5, 1fr)',
-        gridTemplateRows: 'repeat(5, 1fr)',
+        gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+        gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
         gridAutoFlow: 'dense',
         gap,
       }}
     >
-      {sorted.map((photo) => (
+      {sorted.map((photo) => {
+        const p = dragPreview?.photoId === photo.id ? dragPreview : null;
+        const colSpan = p?.colSpan ?? Math.min(photo.colSpan ?? 1, GRID_COLS);
+        const rowSpan = p?.rowSpan ?? Math.min(photo.rowSpan ?? 1, GRID_ROWS);
+        const colStart = p?.col ?? photo.gridColStart;
+        const rowStart = p?.row ?? photo.gridRowStart;
+        const isMoving = p?.col !== undefined;
+
+        return (
+          <div
+            key={photo.id}
+            className={`relative group ${fillPage ? '' : 'rounded'} ${isMoving ? 'opacity-40 ring-2 ring-blue-400 ring-inset' : 'bg-gray-100'} overflow-hidden`}
+            style={{
+              gridColumn: colStart ? `${colStart} / span ${colSpan}` : `span ${colSpan}`,
+              gridRow: rowStart ? `${rowStart} / span ${rowSpan}` : `span ${rowSpan}`,
+            }}
+          >
+            <DraggablePhoto
+              photo={photo}
+              onUpdatePhoto={onUpdatePhoto}
+              gridMode
+              onUpdatePhotoFields={onUpdatePhotoFields}
+              isSelected={selectedPhotoId === photo.id}
+              onSelectPhoto={onSelectPhoto}
+              hideNumbers={hideNumbers}
+            />
+
+            {/* ── Grip / move handle (top-centre) ── */}
+            {onUpdatePhotoFields && (
+              <div
+                className="absolute inset-x-0 top-0 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                style={{ pointerEvents: 'none' }}
+              >
+                <div
+                  data-overlay
+                  className="bg-black/50 hover:bg-black/70 text-white rounded-b px-2 py-px text-[10px] leading-tight select-none cursor-grab active:cursor-grabbing"
+                  style={{ pointerEvents: 'auto' }}
+                  onMouseDown={(e) => onGripDown(e, photo)}
+                  title="Drag to move to a new cell"
+                >
+                  ⠿
+                </div>
+              </div>
+            )}
+
+            {/* ── Right-edge col-resize strip ── */}
+            {onUpdatePhotoFields && (
+              <div
+                data-overlay
+                className="absolute top-0 right-0 w-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-col-resize"
+                style={{ bottom: '1.5rem', background: 'rgba(99,102,241,0.55)' }}
+                onMouseDown={(e) => onEdgeDown(e, photo, 'col')}
+                title="Drag to resize columns"
+              />
+            )}
+
+            {/* ── Bottom-edge row-resize strip ── */}
+            {onUpdatePhotoFields && (
+              <div
+                data-overlay
+                className="absolute left-0 bottom-0 h-2 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-row-resize"
+                style={{ right: '1.5rem', background: 'rgba(99,102,241,0.55)' }}
+                onMouseDown={(e) => onEdgeDown(e, photo, 'row')}
+                title="Drag to resize rows"
+              />
+            )}
+
+            {/* ── Bottom-right corner both-resize handle ── */}
+            {onUpdatePhotoFields && (
+              <div
+                data-overlay
+                className="absolute right-0 bottom-0 w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-nwse-resize flex items-center justify-center rounded-tl"
+                style={{ background: 'rgba(79,70,229,0.75)' }}
+                onMouseDown={(e) => onEdgeDown(e, photo, 'both')}
+                title="Drag to resize"
+              >
+                {/* Resize grip dots */}
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="white" opacity="0.9">
+                  <rect x="5" y="1" width="1.5" height="1.5" rx="0.5"/>
+                  <rect x="5" y="4" width="1.5" height="1.5" rx="0.5"/>
+                  <rect x="5" y="7" width="1.5" height="1.5" rx="0.5"/>
+                  <rect x="2" y="4" width="1.5" height="1.5" rx="0.5"/>
+                  <rect x="2" y="7" width="1.5" height="1.5" rx="0.5"/>
+                </svg>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* ── Move target ghost ── */}
+      {dragPreview?.col !== undefined && (
         <div
-          key={photo.id}
-          className={`overflow-hidden bg-gray-100 relative ${fillPage ? '' : 'rounded'}`}
+          className="pointer-events-none absolute inset-0 z-30"
           style={{
-            gridColumn: `span ${Math.min(photo.colSpan ?? 1, 5)}`,
-            gridRow: `span ${Math.min(photo.rowSpan ?? 1, 5)}`,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
+            gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`,
+            gap,
           }}
         >
-          <DraggablePhoto
-            photo={photo}
-            onUpdatePhoto={onUpdatePhoto}
-            gridMode
-            onUpdatePhotoFields={onUpdatePhotoFields}
-            isSelected={selectedPhotoId === photo.id}
-            onSelectPhoto={onSelectPhoto}
-            hideNumbers={hideNumbers}
+          <div
+            className="rounded border-2 border-blue-500 border-dashed bg-blue-400/20"
+            style={{
+              gridColumn: `${dragPreview.col} / span ${dragPreview.colSpan ?? 1}`,
+              gridRow: `${dragPreview.row} / span ${dragPreview.rowSpan ?? 1}`,
+            }}
           />
         </div>
-      ))}
+      )}
     </div>
   );
 }
