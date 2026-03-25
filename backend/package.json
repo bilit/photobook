@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc && cp -r src/templates dist/templates",
+    "postinstall": "npx puppeteer browsers install chrome",
     "start": "node dist/index.js"
   },
   "dependencies": {
