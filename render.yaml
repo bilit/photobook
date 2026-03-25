@@ -2,7 +2,7 @@ services:
   - type: web
     name: photobook
     runtime: node
-    buildCommand: npm run install:all && npm run build
+    buildCommand: PUPPETEER_CACHE_DIR=/opt/render/project/src/backend/.cache/puppeteer npm run install:all && npm run build
     startCommand: node backend/dist/index.js
     envVars:
       - key: NODE_ENV
@@ -15,5 +15,7 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/project/src/backend/.cache/puppeteer
       - key: BACKEND_URL
         sync: false
