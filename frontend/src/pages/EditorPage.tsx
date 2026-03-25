@@ -35,6 +35,7 @@ import AlbumImporter from '../components/AlbumImporter';
 import FileUploader from '../components/FileUploader';
 import PhotoGroupCard from '../components/PhotoGroupCard';
 import PagePreview from '../components/PagePreview';
+import PagesByDateModal from '../components/PagesByDateModal';
 import type { PhotoBook, PhotoGroup, PhotoItem, CustomTemplate } from '../types';
 import { generatePdf } from '../api/client';
 import { loadTemplates } from '../templateStore';
@@ -94,6 +95,7 @@ export default function EditorPage({ user }: Props) {
   const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
   const [leftOpen, setLeftOpen] = useState(() => localStorage.getItem(LEFT_KEY) !== 'false');
   const [rightOpen, setRightOpen] = useState(() => localStorage.getItem(RIGHT_KEY) !== 'false');
+  const [showPagesByDate, setShowPagesByDate] = useState(false);
 
   // Persist book — debounced to avoid hammering storage on every keystroke/drag
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,6 +188,17 @@ export default function EditorPage({ user }: Props) {
 
   const refreshTemplates = () => {
     setCustomTemplates(loadTemplates());
+  };
+
+  const handlePagesByDate = (payload: { groups: PhotoGroup[]; replace: boolean }) => {
+    setBook((b) => ({
+      ...b,
+      groups: payload.replace ? payload.groups : [...b.groups, ...payload.groups],
+    }));
+    if (payload.groups.length > 0) {
+      setSelectedGroupId(payload.groups[0].id);
+    }
+    setShowPagesByDate(false);
   };
 
   const updatePhotoCrop = (photoId: string, cropX: number, cropY: number, zoom?: number) => {
@@ -320,9 +333,17 @@ export default function EditorPage({ user }: Props) {
                     + Upload Files
                   </button>
                   {book.importedPhotos.length > 0 && (
-                    <p className="text-xs text-center text-gray-400">
-                      {book.importedPhotos.length} in library
-                    </p>
+                    <>
+                      <p className="text-xs text-center text-gray-400">
+                        {book.importedPhotos.length} in library
+                      </p>
+                      <button
+                        onClick={() => setShowPagesByDate(true)}
+                        className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-indigo-200 text-xs"
+                      >
+                        📅 Create by Date
+                      </button>
+                    </>
                   )}
                 </div>
 
@@ -521,6 +542,14 @@ export default function EditorPage({ user }: Props) {
             )}
           </div>
         </div>
+      )}
+
+      {showPagesByDate && (
+        <PagesByDateModal
+          importedPhotos={book.importedPhotos}
+          onApply={handlePagesByDate as any}
+          onClose={() => setShowPagesByDate(false)}
+        />
       )}
     </div>
   );
