@@ -39,6 +39,13 @@ interface PhotoBook {
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');
 
+function toDataUri(filePath: string): string {
+  const data = fs.readFileSync(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  const mime = ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
+  return `data:${mime};base64,${data.toString('base64')}`;
+}
+
 // Scale the used zones (those with photos) to fill the full page area
 function fillPageZones(zones: TemplateZone[], photoCount: number): TemplateZone[] {
   const used = zones.slice(0, photoCount);
@@ -70,10 +77,10 @@ function loadBaseCSS(): string {
 function buildPhotoSlots(photos: PhotoItem[]): string {
   return photos
     .map((photo, i) => {
-      const imgUrl = photo.id.startsWith('local-')
-        ? photo.url
-        : photo.id.startsWith('cached-')
-          ? `file://${photo.url}`
+      const imgUrl = photo.id.startsWith('cached-')
+        ? toDataUri(photo.url)
+        : photo.id.startsWith('local-')
+          ? photo.url
           : `${photo.url}=w2000-h2000`;
       const cropX = photo.cropX ?? 50;
       const cropY = photo.cropY ?? 50;
@@ -87,7 +94,7 @@ function renderFocalTemplate(group: PhotoGroup, baseCSS: string): string {
   const n = sorted.length;
   const template = loadTemplate('focal');
   const slots = buildPhotoSlots(sorted);
-  const hasTitle = group.name && group.name.trim() !== '';
+  const hasTitle = false;
   const fillCSS = group.fillPage
     ? `.page { padding: 0; gap: 0; }
 .layout { gap: 0; }
@@ -110,7 +117,7 @@ function renderGridTemplate(group: PhotoGroup, baseCSS: string): string {
   const cols = Math.ceil(Math.sqrt(n));
   const template = loadTemplate('grid');
   const slots = buildPhotoSlots(sorted);
-  const hasTitle = group.name && group.name.trim() !== '';
+  const hasTitle = false;
   const fillCSS = group.fillPage
     ? `.page { padding: 0; gap: 0; }
 .layout { gap: 0; }
@@ -133,7 +140,7 @@ function renderCustomTemplate(group: PhotoGroup, baseCSS: string): string {
   const zones = group.fillPage && sorted.length < rawZones.length
     ? fillPageZones(rawZones, sorted.length)
     : rawZones;
-  const hasTitle = group.name && group.name.trim() !== '';
+  const hasTitle = false;
 
   // Build absolute-positioned zone CSS
   const zoneCSS = zones
@@ -156,10 +163,10 @@ function renderCustomTemplate(group: PhotoGroup, baseCSS: string): string {
     .map((_, i) => {
       const photo = sorted[i];
       if (!photo) return `<div class="zone-${i}"></div>`;
-      const imgUrl = photo.id.startsWith('local-')
-        ? photo.url
-        : photo.id.startsWith('cached-')
-          ? `file://${photo.url}`
+      const imgUrl = photo.id.startsWith('cached-')
+        ? toDataUri(photo.url)
+        : photo.id.startsWith('local-')
+          ? photo.url
           : `${photo.url}=w2000-h2000`;
       const cropX = photo.cropX ?? 50;
       const cropY = photo.cropY ?? 50;
